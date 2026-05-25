@@ -82,6 +82,9 @@ export class AgentBridgeClient {
       source?: string
       instructions?: string
       storage_message?: string | Array<Record<string, unknown>>
+      conversation_history?: Array<Record<string, unknown>>
+      wait?: boolean
+      timeout?: number
     },
   ): Promise<AgentBridgeChatStarted> {
     return this.request<AgentBridgeChatStarted>({

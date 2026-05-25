@@ -99,9 +99,54 @@ describe('AgentBridgeClient', () => {
       source: 'test',
       instructions: 'be helpful',
       storage_message: 'stored',
+      conversation_history: [{ role: 'user', content: 'prior' }],
+      wait: true,
+      timeout: 30000,
     })
     expect(result.ok).toBe(true)
     expect(result.session_id).toBe('session-2')
+  })
+
+  it('should send exact wire payload for chat with all fields', async () => {
+    let capturedPayload: Record<string, unknown> = {}
+    const capturePath = `/tmp/rooster-test-capture-${String(process.pid)}.sock`
+    const captureServer = createMockServer(capturePath, (request, conn) => {
+      capturedPayload = request
+      conn.write(JSON.stringify({ ok: true, run_id: 'r1', session_id: 's1', status: 'running' }) + '\n')
+      conn.end()
+    })
+
+    const client = new AgentBridgeClient({ endpoint: capturePath })
+    const history = [{ role: 'user', content: 'hello' }, { role: 'assistant', content: 'hi' }]
+    await client.chat('sess-wire', [{ type: 'text', text: 'msg' }], {
+      profile: 'coding',
+      model: 'claude-4',
+      provider: 'anthropic',
+      force_compress: true,
+      source: 'web',
+      instructions: 'be concise',
+      storage_message: [{ type: 'text', text: 'stored' }],
+      conversation_history: history,
+      wait: true,
+      timeout: 60000,
+    })
+
+    expect(capturedPayload).toEqual({
+      action: 'chat',
+      session_id: 'sess-wire',
+      message: [{ type: 'text', text: 'msg' }],
+      profile: 'coding',
+      model: 'claude-4',
+      provider: 'anthropic',
+      force_compress: true,
+      source: 'web',
+      instructions: 'be concise',
+      storage_message: [{ type: 'text', text: 'stored' }],
+      conversation_history: history,
+      wait: true,
+      timeout: 60000,
+    })
+    captureServer.close()
   })
 
   it('should get output from a run', async () => {
