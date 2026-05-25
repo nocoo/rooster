@@ -259,9 +259,13 @@ via inline script (no flash):
 
 ## 12. Testing Strategy
 
-Coverage target: **95%+** (view layer in `pages/` and `components/` excluded
-from coverage threshold; all other client code — state, api, ws, lib — must
-meet the threshold).
+Coverage target: **95%+**. Only pure presentational wrappers are excluded:
+- `pages/**` (layout/routing shells)
+- `components/**/*.view.tsx` (stateless presentational components)
+
+All other client code must meet the threshold: `state/`, `api/`, `ws/`,
+`lib/`, and components with event handlers or state logic (e.g. `ChatInput`,
+`SessionList`, `ToolTrace`).
 
 | Layer | Tool | Approach |
 |-------|------|----------|

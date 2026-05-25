@@ -75,7 +75,7 @@ IPC/Socket.IO protocol and API contract.
                ▼                    ▼
 ┌─────────────────────────────────────────────────────┐
 │                  Rooster Server                       │
-│         Koa + Socket.IO + better-sqlite3             │
+│        Hono + Socket.IO + better-sqlite3             │
 │         (reimplemented from protocol spec)           │
 └──────────────┬────────────────────┬──────────────────┘
                │ IPC socket         │ HTTP proxy (SSE)
@@ -94,7 +94,7 @@ IPC/Socket.IO protocol and API contract.
 | Frontend bundler | Vite | Vite (same concept, latest stable) |
 | Frontend styling | Sass + Naive UI components | **Primer CSS** (GitHub design system) |
 | Frontend state | Pinia stores | **@preact/signals** |
-| Server framework | Koa | **Koa** (reimplemented, same framework choice) |
+| Server framework | Koa | **Hono** (lightweight, Web Standard APIs) |
 | Server DB | node:sqlite | **better-sqlite3** (synchronous, well-tested) |
 | Real-time | Socket.IO | **Socket.IO** (protocol-compatible) |
 | Agent protocol | AgentBridge (IPC) + Gateway (SSE) | Reimplemented to match protocol spec |
@@ -109,7 +109,7 @@ IPC/Socket.IO protocol and API contract.
 ```
 rooster/
 ├── packages/
-│   ├── server/          # Koa server — reimplemented from protocol spec
+│   ├── server/          # Hono server — reimplemented from protocol spec
 │   │   ├── src/
 │   │   │   ├── index.ts
 │   │   │   ├── routes/

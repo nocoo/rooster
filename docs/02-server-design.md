@@ -143,7 +143,11 @@ The startup banner will print a warning when `BIND_HOST` is not localhost:
 ### Coverage Policy
 
 - **Server**: 95%+ line coverage, no exclusions
-- **Client**: 95%+ line coverage, `pages/` and `components/` (view layer) excluded
+- **Client**: 95%+ line coverage; only pure presentational wrappers excluded:
+  - `pages/**` (layout/routing shells)
+  - `components/**/*.view.tsx` (stateless presentational components)
+- **Must be covered** (even in client): `ws/`, `api/`, `state/`, `lib/`,
+  and any component with event handlers or state logic
 - Coverage threshold enforced in `vitest.config.ts` — failing coverage blocks commit
 
 ### Lint Configuration

@@ -104,13 +104,13 @@ All requests are JSON objects with an `action` field. Wire format: JSON + `\n`.
 | Action | Wire Payload Fields | Response |
 |--------|-------------------|----------|
 | `ping` | — | `AgentBridgeResponse` |
-| `chat` | `session_id, message, profile?, model?, provider?, force_compress?, source?, wait?, timeout?` | `AgentBridgeChatStarted` |
+| `chat` | `session_id, message, profile?, model?, provider?, force_compress?, source?, wait?, timeout?, instructions?, storage_message?, conversation_history?` | `AgentBridgeChatStarted` |
 | `get_output` | `run_id, cursor, event_cursor` | `AgentBridgeOutput` |
 | `get_result` | `run_id` | `AgentBridgeRunResult` |
 | `interrupt` | `session_id, message?, profile?` | `AgentBridgeResponse` |
 | `steer` | `session_id, text, profile?` | `AgentBridgeResponse` |
 | `command` | `session_id, command` | `AgentBridgeCommandResult` |
-| `context_estimate` | `session_id` | `AgentBridgeContextEstimate` |
+| `context_estimate` | `session_id, messages?, instructions?, profile?, model?, provider?` | `AgentBridgeContextEstimate` |
 | `approval_respond` | `approval_id, choice` | `AgentBridgeResponse` |
 | `clarify_respond` | `clarify_id, response` | `AgentBridgeResponse` |
 | `compression_respond` | `request_id, messages?, system_message?, error?` | `AgentBridgeResponse` |

@@ -9,10 +9,10 @@ chat that connects to Hermes Agent.
 
 | Constraint | Rule |
 |-----------|------|
-| Package manager | **bun** (no npm/yarn lockfiles) |
-| Dependencies | Latest stable at time of implementation |
-| Pre-commit | ESLint strict (0 warnings) + tsc --noEmit + vitest (all pass) |
-| Coverage | 95%+ (server: no exclusions; client: `pages/` and `components/` excluded) |
+| Package manager | **bun** (no npm/yarn/pnpm lockfiles; commit `bun.lock`) |
+| Dependencies | Latest stable via `bun add <pkg>@latest` at init |
+| Pre-commit chain | `bun run lint` → `bun run typecheck` → `bun test --coverage` |
+| Coverage gate | 95%+ or commit blocked. Server: no exclusions. Client: only `pages/**` and `components/**/*.view.tsx` excluded |
 | Commits | Atomic, to local `main`, never auto-push |
 | Implementation | Clean-room from protocol spec; no hermes-web-ui code copied |
 
@@ -33,10 +33,15 @@ chat that connects to Hermes Agent.
 ### Infrastructure Tasks
 
 1. Create bun workspace root (`package.json`, `bunfig.toml`)
-2. Configure vitest with coverage thresholds (95%+)
-3. Configure ESLint flat config (strict, `--max-warnings 0`)
-4. Configure husky + lint-staged for pre-commit hooks
-5. Configure TypeScript (strict mode, path aliases)
+2. Initialize packages with `bun add <pkg>@latest` / `bun add -d <pkg>@latest`;
+   commit `bun.lock`; delete any npm/yarn/pnpm lockfiles if generated
+3. Configure vitest with v8 coverage provider + 95% threshold (fail on miss)
+4. Configure ESLint flat config (strict, `--max-warnings 0`)
+5. Configure husky + lint-staged:
+   ```
+   pre-commit: bun run lint → bun run typecheck → bun test --coverage
+   ```
+6. Configure TypeScript (strict mode, path aliases)
 
 ### Server Tasks (Hono)
 
@@ -119,20 +124,21 @@ Working chat with Hermes Agent. Start: `bun run dev`. Open browser. Chat.
 ## Phase 3 — Admin Features
 
 **Goal**: Full management panel. Each is independent and can ship separately.
+Each feature requires its own design/review cycle before implementation.
 
-| Feature | Depends On |
-|---------|-----------|
-| Profile management (CRUD, config editor) | Phase 1 |
-| Skills management (list, create, edit) | Phase 1 |
-| Plugins (install, remove) | Phase 1 |
-| Memory browser (list, delete) | Phase 1 |
-| Models & providers config | Phase 1 |
-| File browser | Phase 1 |
-| Terminal (xterm.js) | Phase 1 |
-| Log viewer | Phase 1 |
-| Jobs / cron history | Phase 1 |
-| Runtime config / settings | Phase 1 |
-| Self-update | Phase 1 |
+| Feature | Prerequisite |
+|---------|-------------|
+| Profile management (CRUD, config editor) | Phase 1 + design review |
+| Skills management (list, create, edit) | Phase 1 + design review |
+| Plugins (install, remove) | Phase 1 + design review |
+| Memory browser (list, delete) | Phase 1 + design review |
+| Models & providers config | Phase 1 + design review |
+| File browser | Phase 1 + separate security review |
+| Terminal (xterm.js) | Phase 1 + separate security review |
+| Log viewer | Phase 1 + design review |
+| Jobs / cron history | Phase 1 + design review |
+| Runtime config / settings | Phase 1 + design review |
+| Self-update | Phase 1 + separate security review |
 
 ---
 
