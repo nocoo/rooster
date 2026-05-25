@@ -32,6 +32,26 @@ export interface AgentBridgeOptions {
   connectRetryMs?: number
 }
 
+const RETRYABLE_CODES = new Set([
+  'ECONNREFUSED',
+  'ENOENT',
+  'ECONNRESET',
+  'EPIPE',
+  'ETIMEDOUT',
+])
+
+function parseEndpoint(endpoint: string): net.NetConnectOpts {
+  if (endpoint.startsWith('tcp://')) {
+    const rest = endpoint.slice(6)
+    const [host, portStr] = rest.split(':') as [string, string | undefined]
+    return { host, port: parseInt(portStr ?? '18765', 10) }
+  }
+  if (endpoint.startsWith('ipc://')) {
+    return { path: endpoint.slice(6) }
+  }
+  return { path: endpoint }
+}
+
 export class AgentBridgeClient {
   private readonly endpoint: string
   private readonly timeoutMs: number
@@ -121,76 +141,78 @@ export class AgentBridgeClient {
   private request<T extends AgentBridgeResponse = AgentBridgeResponse>(
     payload: Record<string, unknown>,
   ): Promise<T> {
-    const execute = (): Promise<T> =>
-      new Promise((resolve, reject) => {
-        const data = JSON.stringify(payload) + '\n'
-        const endpoint = this.endpoint
+    const execute = (): Promise<T> => {
+      const data = JSON.stringify(payload) + '\n'
+      const connectOpts = parseEndpoint(this.endpoint)
+      const deadline = Date.now() + this.connectRetryMs
+      const retryInterval = 100
 
-        const isIpc = !endpoint.startsWith('tcp://')
-        const connectOpts: net.NetConnectOpts = isIpc
-          ? { path: endpoint }
-          : {
-              host: endpoint.replace('tcp://', '').split(':')[0],
-              port: parseInt(
-                endpoint.replace('tcp://', '').split(':')[1] ?? '18765',
-                10,
-              ),
+      const attempt = (): Promise<T> =>
+        new Promise((resolve, reject) => {
+          const socket = net.connect(connectOpts)
+          let responseData = ''
+          let settled = false
+
+          const timeout = setTimeout(() => {
+            /* v8 ignore next 4 -- guard for race where response arrives just before timeout fires */
+            if (!settled) {
+              settled = true
+              socket.destroy()
+              reject(new Error(`Agent bridge timeout after ${String(this.timeoutMs)}ms`))
             }
+          }, this.timeoutMs)
 
-        const socket = net.connect(connectOpts)
-        let responseData = ''
-        let settled = false
+          socket.on('connect', () => {
+            socket.write(data)
+          })
 
-        const timeout = setTimeout(() => {
-          /* v8 ignore next 4 -- guard for race where response arrives just before timeout fires */
-          if (!settled) {
-            settled = true
-            socket.destroy()
-            reject(new Error(`Agent bridge timeout after ${String(this.timeoutMs)}ms`))
-          }
-        }, this.timeoutMs)
-
-        socket.on('connect', () => {
-          socket.write(data)
-        })
-
-        socket.on('data', (chunk) => {
-          responseData += chunk.toString()
-          const newlineIdx = responseData.indexOf('\n')
-          if (newlineIdx !== -1) {
-            clearTimeout(timeout)
-            settled = true
-            socket.destroy()
-            try {
-              const parsed = JSON.parse(responseData.slice(0, newlineIdx)) as T
-              if (!parsed.ok) {
-                reject(
-                  new AgentBridgeError(
-                    (parsed['error'] as string | undefined) ??
-                      'Bridge returned ok:false',
-                    parsed,
-                  ),
-                )
-              } else {
-                resolve(parsed)
+          socket.on('data', (chunk) => {
+            responseData += chunk.toString()
+            const newlineIdx = responseData.indexOf('\n')
+            if (newlineIdx !== -1) {
+              clearTimeout(timeout)
+              settled = true
+              socket.destroy()
+              try {
+                const parsed = JSON.parse(responseData.slice(0, newlineIdx)) as T
+                if (!parsed.ok) {
+                  reject(
+                    new AgentBridgeError(
+                      (parsed['error'] as string | undefined) ??
+                        'Bridge returned ok:false',
+                      parsed,
+                    ),
+                  )
+                } else {
+                  resolve(parsed)
+                }
+              } catch (e) {
+                reject(new Error(`Failed to parse bridge response: ${String(e)}`))
               }
-            } catch (e) {
-              reject(new Error(`Failed to parse bridge response: ${String(e)}`))
             }
-          }
+          })
+
+          socket.on('error', (err) => {
+            if (!settled) {
+              clearTimeout(timeout)
+              settled = true
+              reject(err)
+            }
+          })
         })
 
-        socket.on('error', (err) => {
-          /* v8 ignore next 5 -- guard for race where error fires after response settled */
-          if (!settled) {
-            clearTimeout(timeout)
-            settled = true
-            reject(
-              new AgentBridgeError(`Bridge connection error: ${err.message}`),
-            )
-          }
-        })
-      })
+      const retryLoop = (err: unknown): Promise<T> => {
+        const errCode = (err as NodeJS.ErrnoException).code
+        if (errCode && RETRYABLE_CODES.has(errCode) && Date.now() < deadline) {
+          return new Promise((r) => setTimeout(r, retryInterval)).then(attempt).catch(retryLoop)
+        }
+        if (err instanceof AgentBridgeError) throw err
+        const msg = err instanceof Error ? err.message : String(err)
+        throw new AgentBridgeError(`Bridge connection error: ${msg}`)
+      }
+
+      return attempt().catch(retryLoop)
+    }
 
     const prev = this.lock
     const next = prev.then(execute, execute)

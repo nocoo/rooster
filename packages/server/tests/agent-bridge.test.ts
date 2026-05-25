@@ -177,6 +177,7 @@ describe('AgentBridgeClient', () => {
   it('should throw AgentBridgeError on connection error', async () => {
     const client = new AgentBridgeClient({
       endpoint: '/tmp/rooster-nonexistent-socket.sock',
+      connectRetryMs: 0,
     })
     await expect(client.ping()).rejects.toThrow(AgentBridgeError)
   })
@@ -211,8 +212,8 @@ describe('AgentBridgeClient', () => {
     const client = new AgentBridgeClient({
       endpoint: 'tcp://127.0.0.1',
       timeoutMs: 100,
+      connectRetryMs: 0,
     })
-    // Default port 18765 — connection will fail fast on localhost
     await expect(client.ping()).rejects.toThrow(AgentBridgeError)
   })
 
@@ -266,9 +267,85 @@ describe('AgentBridgeClient', () => {
     noErrServer.close()
   })
 
+  it('should connect via ipc:// endpoint', async () => {
+    const ipcPath = `/tmp/rooster-test-ipc-${String(process.pid)}.sock`
+    const ipcServer = createMockServer(ipcPath, (_request, conn) => {
+      conn.write(JSON.stringify({ ok: true }) + '\n')
+      conn.end()
+    })
+
+    const client = new AgentBridgeClient({ endpoint: `ipc://${ipcPath}` })
+    const result = await client.ping()
+    expect(result.ok).toBe(true)
+    ipcServer.close()
+  })
+
+  it('should connect via plain unix path endpoint', async () => {
+    const client = new AgentBridgeClient({ endpoint: socketPath })
+    const result = await client.ping()
+    expect(result.ok).toBe(true)
+  })
+
   it('should use default endpoint from env', () => {
     const client = new AgentBridgeClient()
     expect(client['endpoint']).toBe('/tmp/hermes-agent-bridge.sock')
+  })
+})
+
+describe('AgentBridgeClient retry', () => {
+  it('should retry and succeed when server starts within retry window', async () => {
+    const retryPath = `/tmp/rooster-test-retry-${String(process.pid)}.sock`
+    const client = new AgentBridgeClient({
+      endpoint: retryPath,
+      connectRetryMs: 500,
+    })
+
+    // Start server after 150ms
+    setTimeout(() => {
+      const srv = createMockServer(retryPath, (_request, conn) => {
+        conn.write(JSON.stringify({ ok: true }) + '\n')
+        conn.end()
+      })
+      // Clean up after test
+      setTimeout(() => { srv.close() }, 500)
+    }, 150)
+
+    const result = await client.ping()
+    expect(result.ok).toBe(true)
+  })
+
+  it('should fail after retry window expires', async () => {
+    const client = new AgentBridgeClient({
+      endpoint: '/tmp/rooster-never-exists.sock',
+      connectRetryMs: 200,
+    })
+
+    await expect(client.ping()).rejects.toThrow(AgentBridgeError)
+  })
+
+  it('should not retry on non-retryable errors (ok:false)', async () => {
+    const noRetryPath = `/tmp/rooster-test-noretry-${String(process.pid)}.sock`
+    const callCount = { value: 0 }
+    const noRetryServer = net.createServer((conn) => {
+      let data = ''
+      conn.on('data', (chunk) => {
+        data += chunk.toString()
+        if (data.includes('\n')) {
+          callCount.value++
+          conn.write(JSON.stringify({ ok: false, error: 'denied' }) + '\n')
+          conn.end()
+        }
+      })
+    })
+    noRetryServer.listen(noRetryPath)
+
+    const client = new AgentBridgeClient({
+      endpoint: noRetryPath,
+      connectRetryMs: 500,
+    })
+    await expect(client.ping()).rejects.toThrow('denied')
+    expect(callCount.value).toBe(1)
+    noRetryServer.close()
   })
 })
 
