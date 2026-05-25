@@ -81,18 +81,18 @@ export class MessageStore {
     if (after) {
       return this.db.prepare(`
         SELECT m.* FROM messages m, messages ref
-        WHERE m.session_id = ? AND ref.id = ?
+        WHERE m.session_id = ? AND ref.id = ? AND ref.session_id = ?
           AND (m.timestamp > ref.timestamp OR (m.timestamp = ref.timestamp AND m.id > ref.id))
         ORDER BY m.timestamp ASC, m.id ASC LIMIT ?
-      `).all(sessionId, after, limit) as Message[]
+      `).all(sessionId, after, sessionId, limit) as Message[]
     }
     if (before) {
       return this.db.prepare(`
         SELECT m.* FROM messages m, messages ref
-        WHERE m.session_id = ? AND ref.id = ?
+        WHERE m.session_id = ? AND ref.id = ? AND ref.session_id = ?
           AND (m.timestamp < ref.timestamp OR (m.timestamp = ref.timestamp AND m.id < ref.id))
         ORDER BY m.timestamp DESC, m.id DESC LIMIT ?
-      `).all(sessionId, before, limit).reverse() as Message[]
+      `).all(sessionId, before, sessionId, limit).reverse() as Message[]
     }
     return this.db.prepare(
       'SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp ASC, id ASC LIMIT ?',

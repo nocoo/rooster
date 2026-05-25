@@ -133,6 +133,15 @@ describe('MessageStore', () => {
       const page = store.paginate('sess-1', { before: 'same-ts-b-4', limit: 2 })
       expect(page[page.length - 1]?.id).toBe('same-ts-b-3')
     })
+
+    it('should return empty when cursor belongs to a foreign session', () => {
+      db.prepare("INSERT INTO sessions (id, started_at, last_active) VALUES ('sess-2', '2025-01-01', '2025-01-01')").run()
+      store.append({ id: 'foreign-msg', session_id: 'sess-2', role: 'user', content: 'foreign', timestamp: '2025-01-01T00:00:05Z' })
+      const afterResult = store.paginate('sess-1', { after: 'foreign-msg', limit: 10 })
+      expect(afterResult).toEqual([])
+      const beforeResult = store.paginate('sess-1', { before: 'foreign-msg', limit: 10 })
+      expect(beforeResult).toEqual([])
+    })
   })
 
   describe('count', () => {
