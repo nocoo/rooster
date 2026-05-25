@@ -11,7 +11,7 @@ chat that connects to Hermes Agent.
 |-----------|------|
 | Package manager | **bun** (no npm/yarn/pnpm lockfiles; commit `bun.lock`) |
 | Dependencies | Latest stable via `bun add <pkg>@latest` at init |
-| Pre-commit chain | `bun run lint` → `bun run typecheck` → `bun test --coverage` |
+| Pre-commit chain | `bun run lint` → `bun run typecheck` → `bun run test:coverage` |
 | Coverage gate | 95%+ or commit blocked. Server: no exclusions. Client: only `pages/**` and `components/**/*.view.tsx` excluded |
 | Commits | Atomic, to local `main`, never auto-push |
 | Implementation | Clean-room from protocol spec; no hermes-web-ui code copied |
@@ -39,7 +39,7 @@ chat that connects to Hermes Agent.
 4. Configure ESLint flat config (strict, `--max-warnings 0`)
 5. Configure husky + lint-staged:
    ```
-   pre-commit: bun run lint → bun run typecheck → bun test --coverage
+   pre-commit: bun run lint → bun run typecheck → bun run test:coverage
    ```
 6. Configure TypeScript (strict mode, path aliases)
 

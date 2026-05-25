@@ -173,8 +173,8 @@ ESLint flat config with strict rules:
 ### Dev Commands
 
 ```
-bun test                  # All unit + integration tests
-bun test:coverage         # With coverage report + threshold check
+bun run test              # All unit + integration tests (vitest)
+bun run test:coverage     # With coverage report + threshold check
 bun run lint              # ESLint strict (0 warnings)
 bun run typecheck         # tsc --noEmit
 ```
