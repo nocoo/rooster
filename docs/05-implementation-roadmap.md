@@ -29,16 +29,35 @@ chat that connects to Hermes Agent.
    - `services/hermes/gateway-manager.ts`
    - `db/` (index, hermes/init, schemas, session-store, sessions-db,
      conversations-db, message-content, usage-store, compression-snapshot)
-   - `routes/hermes/sessions.ts`, `chat-run.ts`, `profiles.ts`, `models.ts`,
-     `providers.ts`, `config.ts`
    - `routes/health.ts`
+   - `routes/hermes/sessions.ts`, `chat-run.ts`, `profiles.ts`, `models.ts`,
+     `providers.ts`
    - `controllers/hermes/sessions.ts`, `profiles.ts`, `models.ts`
    - Supporting: logger, config, lib utils
 4. Remove auth middleware from route chain
 5. Remove user/group-chat/kanban/tts/media tables from `initAllHermesTables()`
 6. Set `BIND_HOST` default to `127.0.0.1`
-7. Verify server starts and responds to `/health`
-8. Write test: mock bridge → Socket.IO `run.started` + `message.delta` + `run.completed`
+7. Register only Phase 1 routes in `routes/index.ts`:
+
+   | Registered (Phase 1) | Copied but NOT registered | Removed (never copied) |
+   |---------------------|--------------------------|------------------------|
+   | `healthRoutes` | `skillRoutes` | `authRoutes` |
+   | `sessionRoutes` | `pluginRoutes` | `kanbanRoutes` |
+   | `profileRoutes` | `memoryRoutes` | `groupChatRoutes` |
+   | `modelRoutes` | `configRoutes` | `ttsRoutes` |
+   | `providerRoutes` | `fileRoutes` | `mediaRoutes` |
+   | `chatRunSocket` (Socket.IO) | `downloadRoutes` | `performanceMonitorRoutes` |
+   | `uploadRoutes` | `logRoutes` | `weixinRoutes` |
+   | | `jobRoutes` | `proxyRoutes` |
+   | | `cronHistoryRoutes` | `codexAuthRoutes` |
+   | | `terminalRoutes` | `nousAuthRoutes` |
+   | | `updateRoutes` | `copilotAuthRoutes` |
+   | | | `xaiAuthRoutes` |
+
+   Phase 3 enables the "copied but not registered" routes one by one.
+
+8. Verify server starts and responds to `/health`
+9. Write test: mock bridge → Socket.IO `run.started` + `message.delta` + `run.completed`
 
 ### Client Tasks
 

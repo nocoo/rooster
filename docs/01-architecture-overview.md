@@ -131,8 +131,8 @@ rooster/
 │       ├── package.json
 │       └── tsconfig.json
 ├── docs/                # Design documents
-├── NOTICE               # BSL-1.1 attribution
-├── LICENSE              # MIT (Rooster additions)
+├── NOTICE               # BSL-1.1 attribution + derivation notes
+├── LICENSE              # BSL-1.1 (hermes-web-ui, covers inherited server code)
 ├── package.json         # Workspace root
 └── vitest.config.ts     # Test config
 ```
@@ -158,8 +158,11 @@ rooster/
    workspaces for clean dependency boundaries, independent testing, and
    parallel builds.
 
-6. **BSL-1.1 compliance** — hermes-web-ui's license is preserved. NOTICE
-   file documents derivation. Rooster's own additions are MIT-licensed.
+6. **BSL-1.1 compliance** — The root LICENSE is BSL-1.1 (inherited from
+   hermes-web-ui, which dominates the server codebase). New files authored
+   for Rooster (primarily the client rewrite) carry per-file SPDX headers
+   (`SPDX-License-Identifier: MIT`). NOTICE documents the derivation and
+   the dual-license boundary.
 
 ## 7. Reference
 

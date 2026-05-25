@@ -116,15 +116,27 @@ interface AgentBridgeCommandResult extends AgentBridgeResponse {
 
 ### Request Actions (JSON payloads sent to bridge)
 
-| Action | Key Fields | Response Type |
-|--------|-----------|---------------|
-| `chat` (initial) | session_id, message, profile, model, provider, force_compress | `AgentBridgeChatStarted` |
-| `chat` (poll) | session_id, run_id, cursor, event_cursor | `AgentBridgeOutput` |
-| `abort` | session_id, run_id | `AgentBridgeResponse` |
-| `session_command` | session_id, command | `AgentBridgeCommandResult` |
-| `context_estimate` | session_id | `AgentBridgeContextEstimate` |
-| `approval_respond` | session_id, approval_id, approved | `AgentBridgeResponse` |
-| `clarify_respond` | session_id, request_id, text | `AgentBridgeResponse` |
+All 17 actions exposed by `AgentBridgeClient` (from `client.ts`):
+
+| Action | Method | Key Fields | Response Type |
+|--------|--------|-----------|---------------|
+| `ping` | `ping()` | — | `AgentBridgeResponse` |
+| `chat` | `chat()` | session_id, message, profile, model, provider, force_compress | `AgentBridgeChatStarted` |
+| `get_output` | `getOutput()` | session_id, run_id, cursor, event_cursor | `AgentBridgeOutput` |
+| `get_result` | `getResult()` | session_id, run_id | `AgentBridgeRunResult` |
+| `interrupt` | `interrupt()` | session_id, run_id | `AgentBridgeResponse` |
+| `steer` | `steer()` | session_id, run_id, message | `AgentBridgeResponse` |
+| `command` | `command()` | session_id, command | `AgentBridgeCommandResult` |
+| `context_estimate` | `contextEstimate()` | session_id | `AgentBridgeContextEstimate` |
+| `approval_respond` | `approvalRespond()` | session_id, approval_id, choice | `AgentBridgeResponse` |
+| `clarify_respond` | `clarifyRespond()` | session_id, clarify_id, text | `AgentBridgeResponse` |
+| `compression_respond` | `compressionRespond()` | session_id, request_id, choice | `AgentBridgeResponse` |
+| `get_history` | `getHistory()` | session_id | `AgentBridgeResponse` |
+| `destroy` | `destroy()` | session_id | `AgentBridgeResponse` |
+| `destroy_all` | `destroyAll()` | — | `AgentBridgeResponse` |
+| `destroy_profile` | `destroyProfile()` | profile | `AgentBridgeResponse` |
+| `list` | `list()` | — | `AgentBridgeResponse` |
+| `shutdown` | `shutdown()` | — | `AgentBridgeResponse` |
 
 ### Connection Lifecycle
 
@@ -156,28 +168,37 @@ Namespace: `/chat-run`
 
 ### Server → Client Events
 
-| Event | Source File | Payload |
+All payloads include `event` (event name echo) and `session_id` (injected by
+`emitToSession` helper). Fields below are additional payload keys.
+
+Note: most fields use **snake_case** (`run_id`, `tool_call_id`, `queue_length`).
+Token/context counters are the exception — they use camelCase (`inputTokens`,
+`outputTokens`, `contextTokens`) matching the internal usage tracker.
+
+| Event | Source File | Payload (additional fields) |
 |-------|------------|---------|
-| `run.started` | response-stream.ts, handle-bridge-run.ts | `{ runId, sessionId }` |
-| `run.failed` | index.ts, handle-api-run.ts, handle-bridge-run.ts | `{ runId?, error, code? }` |
-| `run.queued` | index.ts, abort.ts, session-command.ts | `{ sessionId, queueId, message? }` |
-| `run.peer_user_message` | handle-api-run.ts, handle-bridge-run.ts | `{ sessionId, content }` |
-| `message.delta` | response-stream.ts, handle-bridge-run.ts | `{ delta: string }` |
-| `tool.started` | response-stream.ts, handle-bridge-run.ts | `{ toolName, toolInput?, callId }` |
-| `tool.completed` | response-stream.ts, handle-bridge-run.ts | `{ toolName, result?, callId }` |
-| `usage.updated` | usage.ts, compression.ts | `{ inputTokens, outputTokens, cacheRead?, cacheWrite?, reasoning? }` |
-| `abort.started` | abort.ts | `{ sessionId }` |
-| `abort.completed` | abort.ts | `{ sessionId }` |
-| `compression.started` | compression.ts, handle-bridge-run.ts | `{ sessionId }` |
-| `compression.completed` | compression.ts, handle-bridge-run.ts | `{ sessionId, summary? }` |
-| `session.command` | index.ts, session-command.ts | `{ command, result }` |
-| `approval.requested` | handle-bridge-run.ts | `{ sessionId, approvalId, toolName, toolInput }` |
-| `approval.resolved` | index.ts, handle-bridge-run.ts | `{ approvalId, approved }` |
-| `clarify.requested` | handle-bridge-run.ts | `{ sessionId, requestId, question }` |
-| `clarify.resolved` | index.ts, handle-bridge-run.ts | `{ requestId, answer }` |
-| `reasoning.available` | handle-bridge-run.ts | `{ summary? }` |
-| `agent.event` | handle-bridge-run.ts | `{ type, data }` (generic agent event) |
-| `resumed` | index.ts | `{ sessionId, status }` |
+| `run.started` | response-stream.ts, handle-bridge-run.ts | `run_id, queue_length` (+ `response_id, status` from gateway path) |
+| `run.completed` | handle-bridge-run.ts | `run_id, output, result, error, inputTokens, outputTokens, contextTokens, queue_remaining` |
+| `run.failed` | index.ts, handle-bridge-run.ts | `run_id?, error, inputTokens?, outputTokens?, contextTokens?, queue_remaining?` |
+| `run.queued` | index.ts, abort.ts | `queue_length, queued_messages` (+ `dequeued_queue_id` on dequeue) |
+| `run.peer_user_message` | handle-bridge-run.ts | `message: {id, role, content, timestamp}` |
+| `message.delta` | response-stream.ts, handle-bridge-run.ts | `run_id, delta, output` (+ `response_id` from gateway) |
+| `tool.started` | response-stream.ts, handle-bridge-run.ts | `run_id, tool_call_id, tool, name, arguments, preview` |
+| `tool.completed` | response-stream.ts, handle-bridge-run.ts | `run_id, tool_call_id, tool, name, output, duration, error` |
+| `reasoning.delta` | handle-bridge-run.ts | `run_id, text` |
+| `reasoning.available` | handle-bridge-run.ts | `run_id` |
+| `abort.started` | abort.ts | `run_id, graceMs` |
+| `abort.completed` | abort.ts | `run_id, synced, queue_length?` (or `ignored: true` if no active run) |
+| `compression.started` | handle-bridge-run.ts | `run_id, request_id, message_count, token_count, source` |
+| `compression.completed` | handle-bridge-run.ts | `run_id, request_id, compressed, totalMessages, resultMessages, beforeTokens, afterTokens, contextTokens, summaryTokens, source` |
+| `session.command` | index.ts | `command, ok, action, message` |
+| `approval.requested` | handle-bridge-run.ts | `run_id, approval_id, command, description, choices, allow_permanent, timeout_ms` |
+| `approval.resolved` | index.ts, handle-bridge-run.ts | `run_id?, approval_id, choice` |
+| `clarify.requested` | handle-bridge-run.ts | `run_id, clarify_id, question, choices, timeout_ms` |
+| `clarify.resolved` | index.ts, handle-bridge-run.ts | `run_id?, clarify_id` |
+| `agent.event` | handle-bridge-run.ts | `run_id, ...event_fields` (generic pass-through) |
+| `subagent.*` | handle-bridge-run.ts | `run_id, subagent_id, parent_id, depth, ...task_fields` |
+| `resumed` | index.ts | `messages, isWorking, isAborting, events, inputTokens, outputTokens, contextTokens, queueLength, queueMessages` |
 
 ### Event Mapping: Reference → Rooster
 
@@ -187,11 +208,11 @@ coordinated changes with no benefit.
 
 | Category | Events | Status |
 |----------|--------|--------|
-| Run lifecycle | `run.started`, `run.failed`, `run.queued`, `run.peer_user_message` | Keep |
+| Run lifecycle | `run.started`, `run.completed`, `run.failed`, `run.queued`, `run.peer_user_message` | Keep |
 | Streaming | `message.delta` | Keep |
-| Reasoning | `reasoning.available` | Keep |
+| Reasoning | `reasoning.delta`, `reasoning.available` | Keep |
 | Tools | `tool.started`, `tool.completed` | Keep |
-| Usage | `usage.updated` | Keep |
+| Subagents | `subagent.*` (started, delta, tool, completed) | Keep |
 | Abort | `abort.started`, `abort.completed` | Keep |
 | Compression | `compression.started`, `compression.completed` | Keep |
 | Commands | `session.command` | Keep |

@@ -35,7 +35,7 @@ while staying lightweight.
 | Rendering | Preact 10.x | 3KB |
 | Bundler | Vite 6.x | dev-only |
 | Styling | @primer/css 21.x | ~50KB (treeshakeable) |
-| Icons | @primer/octicons-react | tree-shaken |
+| Icons | @primer/octicons (SVG, framework-agnostic) | tree-shaken |
 | Routing | preact-router | 3KB |
 | State | @preact/signals | 1KB |
 | Markdown | markdown-it + highlight.js + KaTeX | ~150KB (lazy-loaded) |
@@ -141,15 +141,16 @@ export function connect() {
   socket.on('connect', () => { connected.value = true })
   socket.on('disconnect', () => { connected.value = false })
   
-  // Chat events
-  socket.on('run.started', onRunStarted)
-  socket.on('message.delta', onMessageDelta)
-  socket.on('tool.started', onToolStarted)
-  socket.on('tool.completed', onToolCompleted)
-  socket.on('run.completed', onRunCompleted)
-  socket.on('run.failed', onRunFailed)
+  // Chat events (field names match server: snake_case for IDs, camelCase for token counters)
+  socket.on('run.started', onRunStarted)       // { run_id, queue_length }
+  socket.on('message.delta', onMessageDelta)   // { run_id, delta, output }
+  socket.on('tool.started', onToolStarted)     // { run_id, tool_call_id, tool, name, arguments, preview }
+  socket.on('tool.completed', onToolCompleted) // { run_id, tool_call_id, tool, name, output, duration, error }
+  socket.on('run.completed', onRunCompleted)   // { run_id, output, result, error, inputTokens, outputTokens, contextTokens }
+  socket.on('run.failed', onRunFailed)         // { error, inputTokens?, outputTokens? }
   socket.on('abort.completed', onAbortCompleted)
-  socket.on('approval.requested', onApprovalRequested)
+  socket.on('approval.requested', onApprovalRequested) // { run_id, approval_id, command, description, choices }
+  socket.on('reasoning.delta', onReasoningDelta) // { run_id, text }
 }
 
 export function sendMessage(sessionId: string, input: string, opts?: {

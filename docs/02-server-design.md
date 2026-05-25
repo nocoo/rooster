@@ -94,47 +94,53 @@ Rooster will restructure into a proper npm workspace.
 
 ## 3. API Route Map (Old → New)
 
-Phase 1 keeps ALL existing paths unchanged (`/api/hermes/*`). No renaming.
-This ensures existing Hermes Agent integrations and any client code works
-without modification during development.
+All existing paths (`/api/hermes/*`) are preserved unchanged — no renaming.
+Routes are classified by registration phase:
 
-| Current Route | Verb | Keep | Rooster Route (same) |
+- **Phase 1**: Registered and active from day one (chat MVP)
+- **Phase 3**: Source copied into repo but NOT registered in `routes/index.ts`
+  until the corresponding admin feature is enabled
+- **Removed**: Never copied (stripped features)
+
+| Current Route | Verb | Phase | Notes |
 |---|---|---|---|
-| `/api/hermes/sessions` | GET | ✓ | `/api/hermes/sessions` |
-| `/api/hermes/sessions/:id` | GET | ✓ | `/api/hermes/sessions/:id` |
-| `/api/hermes/sessions/:id` | DELETE | ✓ | `/api/hermes/sessions/:id` |
-| `/api/hermes/sessions/batch-delete` | POST | ✓ | `/api/hermes/sessions/batch-delete` |
-| `/api/hermes/sessions/:id/rename` | POST | ✓ | `/api/hermes/sessions/:id/rename` |
-| `/api/hermes/sessions/:id/model` | POST | ✓ | `/api/hermes/sessions/:id/model` |
-| `/api/hermes/sessions/:id/workspace` | POST | ✓ | `/api/hermes/sessions/:id/workspace` |
-| `/api/hermes/sessions/:id/export` | GET | ✓ | `/api/hermes/sessions/:id/export` |
-| `/api/hermes/sessions/:id/usage` | GET | ✓ | `/api/hermes/sessions/:id/usage` |
-| `/api/hermes/sessions/conversations` | GET | ✓ | `/api/hermes/sessions/conversations` |
-| `/api/hermes/sessions/conversations/:id/messages` | GET | ✓ | same |
-| `/api/hermes/sessions/conversations/:id/messages/paginated` | GET | ✓ | same |
-| `/api/hermes/sessions/hermes` | GET | ✓ | same |
-| `/api/hermes/sessions/hermes/:id` | GET | ✓ | same |
-| `/api/hermes/search/sessions` | GET | ✓ | same |
-| `/api/hermes/sessions/search` | GET | ✓ | same (alias) |
-| `/api/hermes/sessions/usage` | GET | ✓ | same |
-| `/api/hermes/sessions/context-length` | GET | ✓ | same |
-| `/api/hermes/workspace/folders` | GET | ✓ | same |
-| `/api/hermes/profiles` | GET/POST/PUT/DELETE | ✓ | same |
-| `/api/hermes/skills` | GET/POST/DELETE | ✓ | same |
-| `/api/hermes/plugins` | GET/POST/DELETE | ✓ | same |
-| `/api/hermes/memory` | GET/DELETE | ✓ | same |
-| `/api/hermes/models` | GET | ✓ | same |
-| `/api/hermes/providers` | GET/PUT | ✓ | same |
-| `/api/hermes/config` | GET/PUT | ✓ | same |
-| `/api/hermes/files` | GET | ✓ | same |
-| `/api/hermes/download` | GET | ✓ | same |
-| `/api/hermes/logs` | GET | ✓ | same |
-| `/api/hermes/jobs` | GET | ✓ | same |
-| `/api/hermes/cron-history` | GET | ✓ | same |
-| `/upload` | POST | ✓ | same |
-| `/health` | GET | ✓ | same |
-| `/api/hermes/update` | POST | ✓ | same |
-| `/api/hermes/terminal` | WS | ✓ | same |
+| `/health` | GET | 1 | |
+| `/upload` | POST | 1 | |
+| `/api/hermes/sessions` | GET | 1 | |
+| `/api/hermes/sessions/:id` | GET/DELETE | 1 | |
+| `/api/hermes/sessions/:id/rename` | POST | 1 | |
+| `/api/hermes/sessions/:id/model` | POST | 1 | |
+| `/api/hermes/sessions/:id/workspace` | POST | 1 | |
+| `/api/hermes/sessions/:id/export` | GET | 1 | |
+| `/api/hermes/sessions/:id/usage` | GET | 1 | |
+| `/api/hermes/sessions/conversations` | GET | 1 | |
+| `/api/hermes/sessions/conversations/:id/messages` | GET | 1 | |
+| `/api/hermes/sessions/conversations/:id/messages/paginated` | GET | 1 | |
+| `/api/hermes/sessions/batch-delete` | POST | 1 | |
+| `/api/hermes/sessions/hermes` | GET | 1 | |
+| `/api/hermes/sessions/hermes/:id` | GET | 1 | |
+| `/api/hermes/search/sessions` | GET | 1 | |
+| `/api/hermes/sessions/usage` | GET | 1 | |
+| `/api/hermes/sessions/context-length` | GET | 1 | |
+| `/api/hermes/workspace/folders` | GET | 1 | |
+| `/api/hermes/profiles` | GET/POST/PUT/DELETE | 1 | |
+| `/api/hermes/models` | GET | 1 | |
+| `/api/hermes/providers` | GET/PUT | 1 | |
+| `/api/hermes/skills` | GET/POST/DELETE | 3 | |
+| `/api/hermes/plugins` | GET/POST/DELETE | 3 | |
+| `/api/hermes/memory` | GET/DELETE | 3 | |
+| `/api/hermes/config` | GET/PUT | 3 | |
+| `/api/hermes/files` | GET | 3 | |
+| `/api/hermes/download` | GET | 3 | |
+| `/api/hermes/logs` | GET | 3 | |
+| `/api/hermes/jobs` | GET | 3 | |
+| `/api/hermes/cron-history` | GET | 3 | |
+| `/api/hermes/terminal` | WS | 3 | |
+| `/api/hermes/update` | POST | 3 | |
+
+**Removed routes** (never copied): auth, kanban, kanban-events, group-chat,
+tts, media, performance-monitor, weixin, proxy, proxy-handler, codex-auth,
+nous-auth, copilot-auth, xai-auth.
 
 **Only change**: Remove JWT auth middleware from the route chain. All routes
 become publicly accessible (trusted network assumption).
@@ -215,12 +221,15 @@ hermes-web-ui is licensed BSL-1.1 (Business Source License 1.1). Per BSL-1.1
 terms:
 
 - Source code can be copied and modified for internal/non-production use
-- Rooster will include the original LICENSE and NOTICE in the repository
+- Root `LICENSE` file is BSL-1.1 (covers the inherited server code which
+  dominates the codebase)
 - `package.json` will reference the upstream origin
 - If Rooster is distributed or offered as a service, BSL-1.1 change date
   and production use terms apply
 
-A `NOTICE` file will be added at repo root documenting the derivation.
+New files authored for Rooster (client rewrite, new utilities) carry per-file
+`SPDX-License-Identifier: MIT` headers. `NOTICE` file at repo root documents
+the derivation and dual-license boundary.
 
 ## 8. Package Structure
 
