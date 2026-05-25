@@ -35,8 +35,8 @@ export interface AppendMessageInput {
 
 export interface PaginateOptions {
   limit?: number
-  before?: string
-  after?: string
+  before?: string // message ID cursor
+  after?: string  // message ID cursor
 }
 
 export class MessageStore {
@@ -79,14 +79,20 @@ export class MessageStore {
   paginate(sessionId: string, options: PaginateOptions = {}): Message[] {
     const { limit = 50, before, after } = options
     if (after) {
-      return this.db.prepare(
-        'SELECT * FROM messages WHERE session_id = ? AND timestamp > ? ORDER BY timestamp ASC, id ASC LIMIT ?',
-      ).all(sessionId, after, limit) as Message[]
+      return this.db.prepare(`
+        SELECT m.* FROM messages m, messages ref
+        WHERE m.session_id = ? AND ref.id = ?
+          AND (m.timestamp > ref.timestamp OR (m.timestamp = ref.timestamp AND m.id > ref.id))
+        ORDER BY m.timestamp ASC, m.id ASC LIMIT ?
+      `).all(sessionId, after, limit) as Message[]
     }
     if (before) {
-      return this.db.prepare(
-        'SELECT * FROM messages WHERE session_id = ? AND timestamp < ? ORDER BY timestamp DESC, id DESC LIMIT ?',
-      ).all(sessionId, before, limit).reverse() as Message[]
+      return this.db.prepare(`
+        SELECT m.* FROM messages m, messages ref
+        WHERE m.session_id = ? AND ref.id = ?
+          AND (m.timestamp < ref.timestamp OR (m.timestamp = ref.timestamp AND m.id < ref.id))
+        ORDER BY m.timestamp DESC, m.id DESC LIMIT ?
+      `).all(sessionId, before, limit).reverse() as Message[]
     }
     return this.db.prepare(
       'SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp ASC, id ASC LIMIT ?',

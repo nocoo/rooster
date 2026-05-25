@@ -248,7 +248,7 @@ describe('app routes', () => {
           `pam-${String(i)}`, 'pa1', 'user', `msg ${String(i)}`, `2025-01-01T00:00:${String(i).padStart(2, '0')}Z`,
         )
       }
-      const res = await app.request('/api/hermes/sessions/conversations/pa1/messages/paginated?after=2025-01-01T00:00:03Z&limit=2')
+      const res = await app.request('/api/hermes/sessions/conversations/pa1/messages/paginated?after=pam-3&limit=2')
       expect(res.status).toBe(200)
       const body = (await res.json()) as { messages: Array<{ content: string }> }
       expect(body.messages).toHaveLength(2)
@@ -262,7 +262,7 @@ describe('app routes', () => {
           `pbm-${String(i)}`, 'pb1', 'user', `msg ${String(i)}`, `2025-01-01T00:00:${String(i).padStart(2, '0')}Z`,
         )
       }
-      const res = await app.request('/api/hermes/sessions/conversations/pb1/messages/paginated?before=2025-01-01T00:00:04Z&limit=2')
+      const res = await app.request('/api/hermes/sessions/conversations/pb1/messages/paginated?before=pbm-4&limit=2')
       expect(res.status).toBe(200)
       const body = (await res.json()) as { messages: Array<{ content: string }> }
       expect(body.messages).toHaveLength(2)

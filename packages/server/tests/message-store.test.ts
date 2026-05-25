@@ -66,6 +66,7 @@ describe('MessageStore', () => {
     beforeEach(() => {
       for (let i = 1; i <= 10; i++) {
         store.append({
+          id: `pm-${String(i)}`,
           session_id: 'sess-1',
           role: 'user',
           content: `msg-${String(i)}`,
@@ -85,17 +86,52 @@ describe('MessageStore', () => {
       expect(msgs[0]?.content).toBe('msg-1')
     })
 
-    it('should paginate with after cursor', () => {
-      const msgs = store.paginate('sess-1', { after: '2025-01-01T00:00:05Z', limit: 3 })
+    it('should paginate with after cursor (message ID)', () => {
+      const msgs = store.paginate('sess-1', { after: 'pm-5', limit: 3 })
       expect(msgs).toHaveLength(3)
       expect(msgs[0]?.content).toBe('msg-6')
     })
 
-    it('should paginate with before cursor', () => {
-      const msgs = store.paginate('sess-1', { before: '2025-01-01T00:00:05Z', limit: 3 })
+    it('should paginate with before cursor (message ID)', () => {
+      const msgs = store.paginate('sess-1', { before: 'pm-5', limit: 3 })
       expect(msgs).toHaveLength(3)
       expect(msgs[0]?.content).toBe('msg-2')
       expect(msgs[2]?.content).toBe('msg-4')
+    })
+
+    it('should be stable with same-timestamp messages (after)', () => {
+      for (let i = 1; i <= 5; i++) {
+        store.append({
+          id: `same-ts-${String(i)}`,
+          session_id: 'sess-1',
+          role: 'user',
+          content: `same-${String(i)}`,
+          timestamp: '2025-01-01T00:01:00Z',
+        })
+      }
+      const page1 = store.paginate('sess-1', { after: 'pm-10', limit: 3 })
+      expect(page1).toHaveLength(3)
+      expect(page1[0]?.id).toBe('same-ts-1')
+      expect(page1[2]?.id).toBe('same-ts-3')
+
+      const page2 = store.paginate('sess-1', { after: 'same-ts-3', limit: 3 })
+      expect(page2).toHaveLength(2)
+      expect(page2[0]?.id).toBe('same-ts-4')
+      expect(page2[1]?.id).toBe('same-ts-5')
+    })
+
+    it('should be stable with same-timestamp messages (before)', () => {
+      for (let i = 1; i <= 5; i++) {
+        store.append({
+          id: `same-ts-b-${String(i)}`,
+          session_id: 'sess-1',
+          role: 'user',
+          content: `same-b-${String(i)}`,
+          timestamp: '2025-01-01T00:01:00Z',
+        })
+      }
+      const page = store.paginate('sess-1', { before: 'same-ts-b-4', limit: 2 })
+      expect(page[page.length - 1]?.id).toBe('same-ts-b-3')
     })
   })
 

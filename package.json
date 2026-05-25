@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bun run --filter ./packages/server dev",
     "build": "bun run --filter '*' build",
+    "pretest": "node -e \"require('./packages/server/node_modules/better-sqlite3')\" || (cd packages/server/node_modules/better-sqlite3 && npx --yes prebuild-install || npx --yes node-gyp rebuild --release)",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
