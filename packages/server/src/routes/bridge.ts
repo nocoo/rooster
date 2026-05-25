@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import type { AgentBridgeClient } from '../services/hermes/agent-bridge.js'
 
+// Phase 1 fallback: profiles/models/providers are derived from bridge `list` sessions.
+// If no sessions exist yet, these return empty. Phase 3 will use dedicated bridge actions.
 export function createBridgeRoutes(bridge: AgentBridgeClient): Hono {
   const routes = new Hono()
 

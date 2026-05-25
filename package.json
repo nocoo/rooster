@@ -2,6 +2,7 @@
   "name": "rooster",
   "private": true,
   "workspaces": ["packages/*"],
+  "trustedDependencies": ["better-sqlite3"],
   "scripts": {
     "dev": "bun run --filter ./packages/server dev",
     "build": "bun run --filter '*' build",

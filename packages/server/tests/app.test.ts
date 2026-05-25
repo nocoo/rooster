@@ -33,6 +33,15 @@ describe('app routes', () => {
                 { profile: null, model: null, provider: null },
               ],
             }
+          } else if (req['action'] === 'get_history') {
+            res = {
+              ok: true,
+              session_id: req['session_id'],
+              messages: [
+                { role: 'user', content: 'hello' },
+                { role: 'assistant', content: 'hi there' },
+              ],
+            }
           }
           conn.write(JSON.stringify(res) + '\n')
           conn.end()
@@ -172,6 +181,114 @@ describe('app routes', () => {
       const body = (await res.json()) as { providers: string[] }
       expect(body.providers).toContain('anthropic')
       expect(body.providers).toContain('openai')
+    })
+  })
+
+  describe('GET /api/hermes/sessions/conversations', () => {
+    it('should return empty conversations initially', async () => {
+      const res = await app.request('/api/hermes/sessions/conversations')
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { conversations: unknown[] }
+      expect(body.conversations).toEqual([])
+    })
+
+    it('should return conversations with pagination', async () => {
+      db.prepare("INSERT INTO sessions (id, started_at, last_active) VALUES (?, ?, ?)").run('c1', '2025-01-01', '2025-01-01')
+      db.prepare("INSERT INTO sessions (id, started_at, last_active) VALUES (?, ?, ?)").run('c2', '2025-01-02', '2025-01-02')
+      const res = await app.request('/api/hermes/sessions/conversations?limit=1')
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { conversations: Array<{ id: string }> }
+      expect(body.conversations).toHaveLength(1)
+    })
+  })
+
+  describe('GET /api/hermes/sessions/conversations/:id/messages', () => {
+    it('should return 404 for non-existent session', async () => {
+      const res = await app.request('/api/hermes/sessions/conversations/nope/messages')
+      expect(res.status).toBe(404)
+    })
+
+    it('should return messages for session', async () => {
+      db.prepare("INSERT INTO sessions (id, started_at, last_active) VALUES (?, ?, ?)").run('m1', '2025-01-01', '2025-01-01')
+      db.prepare("INSERT INTO messages (id, session_id, role, content, timestamp) VALUES (?, ?, ?, ?, ?)").run('msg-1', 'm1', 'user', 'hello', '2025-01-01T00:00:01Z')
+      db.prepare("INSERT INTO messages (id, session_id, role, content, timestamp) VALUES (?, ?, ?, ?, ?)").run('msg-2', 'm1', 'assistant', 'hi', '2025-01-01T00:00:02Z')
+      const res = await app.request('/api/hermes/sessions/conversations/m1/messages')
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { messages: Array<{ id: string; content: string }> }
+      expect(body.messages).toHaveLength(2)
+      expect(body.messages[0]?.content).toBe('hello')
+      expect(body.messages[1]?.content).toBe('hi')
+    })
+  })
+
+  describe('GET /api/hermes/sessions/conversations/:id/messages/paginated', () => {
+    it('should return 404 for non-existent session', async () => {
+      const res = await app.request('/api/hermes/sessions/conversations/nope/messages/paginated')
+      expect(res.status).toBe(404)
+    })
+
+    it('should return paginated messages with total', async () => {
+      db.prepare("INSERT INTO sessions (id, started_at, last_active) VALUES (?, ?, ?)").run('p1', '2025-01-01', '2025-01-01')
+      for (let i = 1; i <= 5; i++) {
+        db.prepare("INSERT INTO messages (id, session_id, role, content, timestamp) VALUES (?, ?, ?, ?, ?)").run(
+          `pm-${String(i)}`, 'p1', 'user', `msg ${String(i)}`, `2025-01-01T00:00:${String(i).padStart(2, '0')}Z`,
+        )
+      }
+      const res = await app.request('/api/hermes/sessions/conversations/p1/messages/paginated?limit=2')
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { messages: Array<{ content: string }>; total: number }
+      expect(body.messages).toHaveLength(2)
+      expect(body.total).toBe(5)
+    })
+
+    it('should paginate with after cursor', async () => {
+      db.prepare("INSERT INTO sessions (id, started_at, last_active) VALUES (?, ?, ?)").run('pa1', '2025-01-01', '2025-01-01')
+      for (let i = 1; i <= 5; i++) {
+        db.prepare("INSERT INTO messages (id, session_id, role, content, timestamp) VALUES (?, ?, ?, ?, ?)").run(
+          `pam-${String(i)}`, 'pa1', 'user', `msg ${String(i)}`, `2025-01-01T00:00:${String(i).padStart(2, '0')}Z`,
+        )
+      }
+      const res = await app.request('/api/hermes/sessions/conversations/pa1/messages/paginated?after=2025-01-01T00:00:03Z&limit=2')
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { messages: Array<{ content: string }> }
+      expect(body.messages).toHaveLength(2)
+      expect(body.messages[0]?.content).toBe('msg 4')
+    })
+
+    it('should paginate with before cursor', async () => {
+      db.prepare("INSERT INTO sessions (id, started_at, last_active) VALUES (?, ?, ?)").run('pb1', '2025-01-01', '2025-01-01')
+      for (let i = 1; i <= 5; i++) {
+        db.prepare("INSERT INTO messages (id, session_id, role, content, timestamp) VALUES (?, ?, ?, ?, ?)").run(
+          `pbm-${String(i)}`, 'pb1', 'user', `msg ${String(i)}`, `2025-01-01T00:00:${String(i).padStart(2, '0')}Z`,
+        )
+      }
+      const res = await app.request('/api/hermes/sessions/conversations/pb1/messages/paginated?before=2025-01-01T00:00:04Z&limit=2')
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { messages: Array<{ content: string }> }
+      expect(body.messages).toHaveLength(2)
+      expect(body.messages[0]?.content).toBe('msg 2')
+      expect(body.messages[1]?.content).toBe('msg 3')
+    })
+  })
+
+  describe('GET /api/hermes/sessions/hermes', () => {
+    it('should proxy list request to bridge', async () => {
+      const res = await app.request('/api/hermes/sessions/hermes')
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { ok: boolean; sessions: unknown[] }
+      expect(body.ok).toBe(true)
+      expect(body.sessions).toHaveLength(3)
+    })
+  })
+
+  describe('GET /api/hermes/sessions/hermes/:id', () => {
+    it('should proxy get_history request to bridge', async () => {
+      const res = await app.request('/api/hermes/sessions/hermes/some-session-id')
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { ok: boolean; session_id: string; messages: unknown[] }
+      expect(body.ok).toBe(true)
+      expect(body.session_id).toBe('some-session-id')
+      expect(body.messages).toHaveLength(2)
     })
   })
 
