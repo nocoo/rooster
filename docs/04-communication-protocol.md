@@ -2,167 +2,219 @@
 
 ## 1. Overview
 
-Rooster's server communicates with Hermes Agent via two paths:
+Rooster inherits two communication paths from hermes-web-ui:
 
 1. **Agent Bridge** (IPC/TCP socket) — primary path for chat runs
 2. **Gateway Proxy** (HTTP/SSE) — alternative API-compatible path
 
-Both are inherited from hermes-web-ui and kept unchanged to maintain
-Hermes Agent compatibility.
+Both are inherited verbatim. This document maps the ACTUAL protocol from
+source code, not a redesign.
 
-## 2. Agent Bridge Protocol
+## 2. Agent Bridge Protocol (from `agent-bridge/client.ts`)
 
 ### Transport
 
 - **Unix/macOS**: IPC socket at `/tmp/hermes-agent-bridge.sock`
 - **Windows**: TCP socket at `tcp://127.0.0.1:18765`
+- **Test**: Per-process socket (`/tmp/hermes-agent-bridge-test-${pid}.sock`)
+- **Timeout**: 120,000ms default (`HERMES_AGENT_BRIDGE_TIMEOUT_MS`)
 
-### Message Format
-
-Newline-delimited JSON. One JSON object per message, terminated by `\n`.
-
-### Request Schema
+### TypeScript Types (verbatim from source)
 
 ```typescript
-interface BridgeRequest {
-  action: 'chat' | 'abort' | 'session_command';
-  
-  // Chat action fields
-  session_id?: string;
-  message?: string | ContentBlock[];
-  profile?: string;
-  model?: string;
-  provider?: string;
-  force_compress?: boolean;
-  
-  // Streaming cursor (for polling incremental output)
-  cursor?: number;
-  event_cursor?: number;
-  
-  // Session command fields
-  command?: string;
+// Status values
+type AgentBridgeStatus = 'running' | 'complete' | 'interrupted' | 'error'
+
+// Message input (user message to agent)
+type AgentBridgeMessage = string | Array<Record<string, unknown>>
+
+// Chat options sent with a run request
+interface AgentBridgeChatOptions {
+  force_compress?: boolean
+  storage_message?: AgentBridgeMessage
+  model?: string
+  provider?: string
+  source?: string
+  wait?: boolean
+  timeout?: number
+}
+
+// Base response shape
+interface AgentBridgeResponse {
+  ok: true
+  [key: string]: unknown
+}
+
+// Initial chat response (run started)
+interface AgentBridgeChatStarted extends AgentBridgeResponse {
+  run_id: string
+  session_id: string
+  status: AgentBridgeStatus
+}
+
+// Polling output response (incremental)
+interface AgentBridgeOutput extends AgentBridgeResponse {
+  run_id: string
+  session_id: string
+  status: AgentBridgeStatus
+  delta: string          // New text since last cursor
+  cursor: number         // Text cursor for next poll
+  output: string         // Full accumulated output
+  done: boolean          // True when run complete
+  result?: unknown       // Final result data
+  error?: string | null  // Error message if status='error'
+  events: Array<Record<string, unknown>>  // Structured events
+  event_cursor: number   // Event cursor for next poll
+}
+
+// Full run result (wait=true or after done)
+interface AgentBridgeRunResult extends AgentBridgeResponse {
+  run_id: string
+  session_id: string
+  status: AgentBridgeStatus
+  output: string
+  deltas: string[]
+  events: unknown[]
+  result?: unknown
+  error?: string | null
+}
+
+// Context estimation response
+interface AgentBridgeContextEstimate extends AgentBridgeResponse {
+  session_id: string
+  token_count?: number | null
+  fixed_context_tokens?: number | null
+  system_prompt_tokens?: number | null
+  tool_tokens?: number | null
+  message_count: number
+  tool_count: number
+  tool_names?: string[]
+  system_prompt_chars: number
+  profile?: string
+  model?: string
+  provider?: string
+}
+
+// Session command result
+interface AgentBridgeCommandResult extends AgentBridgeResponse {
+  session_id: string
+  command: string
+  handled: boolean
+  type?: string
+  message?: string
+  output?: string
+  notice?: string
+  loaded?: string[]
+  missing?: string[]
+  new_session_id?: string
+  history?: unknown[]
+  retry?: boolean
+  retry_input?: AgentBridgeMessage
+  title?: string
 }
 ```
 
-### Response Schema
+### Request Actions (JSON payloads sent to bridge)
 
-```typescript
-interface BridgeResponse {
-  ok: boolean;
-  
-  // Run metadata
-  run_id?: string;
-  session_id?: string;
-  status?: 'running' | 'complete' | 'interrupted' | 'error';
-  
-  // Content (incremental)
-  delta?: string;           // New text since last cursor
-  output?: string;          // Full accumulated text
-  
-  // Streaming cursors
-  cursor?: number;          // Text cursor position
-  event_cursor?: number;    // Event stream position
-  done?: boolean;           // True when run is finished
-  
-  // Structured events (tool calls, reasoning, etc.)
-  events?: BridgeEvent[];
-  
-  // Error info
-  error?: string;
-  error_code?: string;
-}
-
-interface BridgeEvent {
-  type: string;             // Event type (see §4)
-  data: unknown;            // Event-specific payload
-  timestamp: number;
-}
-```
+| Action | Key Fields | Response Type |
+|--------|-----------|---------------|
+| `chat` (initial) | session_id, message, profile, model, provider, force_compress | `AgentBridgeChatStarted` |
+| `chat` (poll) | session_id, run_id, cursor, event_cursor | `AgentBridgeOutput` |
+| `abort` | session_id, run_id | `AgentBridgeResponse` |
+| `session_command` | session_id, command | `AgentBridgeCommandResult` |
+| `context_estimate` | session_id | `AgentBridgeContextEstimate` |
+| `approval_respond` | session_id, approval_id, approved | `AgentBridgeResponse` |
+| `clarify_respond` | session_id, request_id, text | `AgentBridgeResponse` |
 
 ### Connection Lifecycle
 
 ```
-1. Server opens IPC/TCP connection to bridge socket
-2. Server sends JSON request + newline
-3. Server reads JSON response + newline
-4. If response.done === false:
-   a. Server sends follow-up request with updated cursor/event_cursor
-   b. Server reads incremental response
-   c. Repeat until done === true
-5. Server closes connection
+1. Open IPC/TCP connection
+2. Send JSON + \n
+3. Read JSON + \n (response)
+4. Close connection
+(repeat for each poll cycle)
 ```
 
-Each chat message is a polling loop: send → read → if not done, send with
-updated cursors → read → repeat.
+The client uses a serialization lock (`this.lock`) to ensure only one
+request is in-flight at a time per client instance.
 
-### Streaming Polling Pattern (Server-side)
+## 3. Socket.IO Events (from `services/hermes/run-chat/`)
 
-```typescript
-async function* streamChat(bridge: AgentBridgeClient, params: ChatParams) {
-  let cursor = 0;
-  let eventCursor = 0;
-  
-  // Initial request
-  let response = await bridge.send({
-    action: 'chat',
-    session_id: params.sessionId,
-    message: params.message,
-    profile: params.profile,
-    model: params.model,
-  });
-  
-  while (!response.done) {
-    // Yield events to caller
-    if (response.events?.length) {
-      for (const event of response.events) {
-        yield event;
-      }
-    }
-    if (response.delta) {
-      yield { type: 'message.delta', data: { delta: response.delta } };
-    }
-    
-    // Update cursors and poll again
-    cursor = response.cursor ?? cursor;
-    eventCursor = response.event_cursor ?? eventCursor;
-    
-    await sleep(50); // Brief pause between polls
-    
-    response = await bridge.send({
-      action: 'chat',
-      session_id: params.sessionId,
-      cursor,
-      event_cursor: eventCursor,
-    });
-  }
-  
-  yield { type: 'run.completed', data: { output: response.output } };
-}
+Namespace: `/chat-run`
+
+### Client → Server Events
+
+| Event | Payload Fields | Handler |
+|-------|---------------|---------|
+| `run` | sessionId, input, model?, provider?, profile?, forceCompress? | `run-chat/index.ts` |
+| `cancel_queued_run` | queueId | `run-chat/index.ts` |
+| `resume` | sessionId | `run-chat/index.ts` |
+| `abort` | sessionId | `run-chat/abort.ts` |
+| `approval.respond` | sessionId, approvalId, approved | `run-chat/index.ts` |
+| `clarify.respond` | sessionId, requestId, text | `run-chat/index.ts` |
+
+### Server → Client Events
+
+| Event | Source File | Payload |
+|-------|------------|---------|
+| `run.started` | response-stream.ts, handle-bridge-run.ts | `{ runId, sessionId }` |
+| `run.failed` | index.ts, handle-api-run.ts, handle-bridge-run.ts | `{ runId?, error, code? }` |
+| `run.queued` | index.ts, abort.ts, session-command.ts | `{ sessionId, queueId, message? }` |
+| `run.peer_user_message` | handle-api-run.ts, handle-bridge-run.ts | `{ sessionId, content }` |
+| `message.delta` | response-stream.ts, handle-bridge-run.ts | `{ delta: string }` |
+| `tool.started` | response-stream.ts, handle-bridge-run.ts | `{ toolName, toolInput?, callId }` |
+| `tool.completed` | response-stream.ts, handle-bridge-run.ts | `{ toolName, result?, callId }` |
+| `usage.updated` | usage.ts, compression.ts | `{ inputTokens, outputTokens, cacheRead?, cacheWrite?, reasoning? }` |
+| `abort.started` | abort.ts | `{ sessionId }` |
+| `abort.completed` | abort.ts | `{ sessionId }` |
+| `compression.started` | compression.ts, handle-bridge-run.ts | `{ sessionId }` |
+| `compression.completed` | compression.ts, handle-bridge-run.ts | `{ sessionId, summary? }` |
+| `session.command` | index.ts, session-command.ts | `{ command, result }` |
+| `approval.requested` | handle-bridge-run.ts | `{ sessionId, approvalId, toolName, toolInput }` |
+| `approval.resolved` | index.ts, handle-bridge-run.ts | `{ approvalId, approved }` |
+| `clarify.requested` | handle-bridge-run.ts | `{ sessionId, requestId, question }` |
+| `clarify.resolved` | index.ts, handle-bridge-run.ts | `{ requestId, answer }` |
+| `reasoning.available` | handle-bridge-run.ts | `{ summary? }` |
+| `agent.event` | handle-bridge-run.ts | `{ type, data }` (generic agent event) |
+| `resumed` | index.ts | `{ sessionId, status }` |
+
+### Event Mapping: Reference → Rooster
+
+**All events kept as-is.** No renaming. The Socket.IO protocol is the contract
+between run-chat service and the frontend. Changing event names would require
+coordinated changes with no benefit.
+
+| Category | Events | Status |
+|----------|--------|--------|
+| Run lifecycle | `run.started`, `run.failed`, `run.queued`, `run.peer_user_message` | Keep |
+| Streaming | `message.delta` | Keep |
+| Reasoning | `reasoning.available` | Keep |
+| Tools | `tool.started`, `tool.completed` | Keep |
+| Usage | `usage.updated` | Keep |
+| Abort | `abort.started`, `abort.completed` | Keep |
+| Compression | `compression.started`, `compression.completed` | Keep |
+| Commands | `session.command` | Keep |
+| Approval | `approval.requested`, `approval.resolved` | Keep |
+| Clarification | `clarify.requested`, `clarify.resolved` | Keep |
+| Agent generic | `agent.event` | Keep |
+| Session | `resumed` | Keep |
+
+## 4. Gateway Proxy (HTTP/SSE)
+
+When a profile has a gateway configured, the server spawns a gateway process
+and proxies requests to its OpenAI-compatible endpoint.
+
+### Upstream Endpoint
+
 ```
-
-## 3. Gateway Proxy (HTTP/SSE Alternative)
-
-When a profile has a gateway configured, the server spawns a separate
-gateway process and proxies requests to it.
-
-### Upstream API
-
-The gateway exposes an OpenAI-compatible endpoint:
-
-```
-POST /v1/responses
+POST {GATEWAY_HOST}/v1/responses
 Content-Type: application/json
 
-{
-  "model": "...",
-  "input": [...],
-  "stream": true
-}
+{"model": "...", "input": [...], "stream": true}
 ```
 
-Response: Server-Sent Events (SSE) stream with JSON frames.
-
-### SSE Frame Format
+### SSE Frame Format (from `run-chat/sse-utils.ts`)
 
 ```
 event: response.output_text.delta
@@ -172,109 +224,44 @@ event: response.completed
 data: {"type":"response.completed","response":{...}}
 ```
 
-The server reads SSE frames and re-emits them as Socket.IO events to the
-browser.
+The server reads SSE frames via `readSseFrames()` and re-emits them as
+Socket.IO events to the browser.
 
-## 4. Socket.IO Events (Server → Browser)
-
-Namespace: `/chat-run`
-
-### Chat Lifecycle Events
-
-| Event | Payload | When |
-|-------|---------|------|
-| `run.started` | `{ runId, sessionId }` | Chat run begins |
-| `run.queued` | `{ sessionId, message }` | Message queued (agent busy) |
-| `run.completed` | `{ runId, sessionId, output }` | Chat run finished |
-| `run.failed` | `{ runId, error }` | Chat run errored |
-
-### Streaming Content Events
-
-| Event | Payload | When |
-|-------|---------|------|
-| `message.delta` | `{ delta: string }` | Incremental response text |
-| `reasoning.delta` | `{ delta: string }` | Incremental reasoning text |
-| `thinking.delta` | `{ delta: string }` | Thinking content (extended) |
-| `reasoning.available` | `{ summary: string }` | Reasoning block available |
-
-### Tool Events
-
-| Event | Payload | When |
-|-------|---------|------|
-| `tool.started` | `{ toolName, toolInput, callId }` | Tool call begins |
-| `tool.completed` | `{ toolName, result, callId }` | Tool call finished |
-
-### Control Events
-
-| Event | Payload | When |
-|-------|---------|------|
-| `abort.started` | `{ sessionId }` | Abort requested |
-| `abort.completed` | `{ sessionId }` | Abort finished |
-| `compression.started` | `{ sessionId }` | Context compression begins |
-| `compression.completed` | `{ sessionId, summary }` | Compression done |
-| `usage.updated` | `{ input, output, cacheRead }` | Token usage update |
-
-### Approval/Clarification Events
-
-| Event | Payload | When |
-|-------|---------|------|
-| `approval.requested` | `{ toolName, toolInput, id }` | Agent needs tool approval |
-| `approval.resolved` | `{ id, approved }` | User approved/denied |
-| `clarify.requested` | `{ question, id }` | Agent needs clarification |
-| `clarify.resolved` | `{ id, answer }` | User answered |
-
-## 5. Socket.IO Events (Browser → Server)
-
-| Event | Payload | Purpose |
-|-------|---------|---------|
-| `chat.send` | `{ sessionId, content, profile?, model? }` | Send message |
-| `chat.abort` | `{ sessionId }` | Abort current run |
-| `approval.respond` | `{ id, approved }` | Answer tool approval |
-| `clarify.respond` | `{ id, answer }` | Answer clarification |
-
-## 6. Data Flow Diagram
+## 5. Data Flow
 
 ```
-User types message
-       │
-       ▼
-[Browser] ──emit('chat.send')──→ [Socket.IO Server]
-                                        │
-                                        ▼
-                                [ChatRunService]
-                                        │
-                          ┌─────────────┼─────────────┐
-                          ▼                           ▼
-                   [AgentBridge]              [GatewayProxy]
-                   (IPC polling)             (HTTP/SSE stream)
-                          │                           │
-                          ▼                           ▼
-                   [Hermes Agent]            [Hermes Gateway]
-                          │                           │
-                          └─────────┬─────────────────┘
-                                    │ responses
-                                    ▼
-                            [ChatRunService]
-                                    │
-                                    ▼ emit Socket.IO events
-                            [Browser updates UI]
+Browser
+  │ emit('run', {sessionId, input, model, profile})
+  ▼
+Socket.IO Server (/chat-run namespace)
+  │ run-chat/index.ts decides bridge vs gateway
+  │
+  ├─[Bridge path]──→ AgentBridgeClient.send({action:'chat', ...})
+  │                    └─→ Poll loop (cursor/event_cursor)
+  │                    └─→ Parse events, emit to socket
+  │
+  └─[Gateway path]─→ fetch(GATEWAY_HOST/v1/responses, {stream:true})
+                       └─→ readSseFrames() → emit to socket
 ```
 
-## 7. Error Handling
+## 6. Error Handling (from source)
 
-| Scenario | Bridge Behavior | Server Action |
-|----------|----------------|---------------|
-| Bridge socket unreachable | Connection refused | Emit `run.failed` with "Agent not running" |
-| Bridge returns `ok: false` | Error in response | Emit `run.failed` with error message |
-| Bridge timeout (>60s no response) | Stale connection | Abort, emit `run.failed` |
-| Gateway SSE disconnects | Stream ends early | Emit `run.failed` with "Connection lost" |
-| Invalid JSON from bridge | Parse error | Log, emit `run.failed` |
+| Error Class | Source | Behavior |
+|---|---|---|
+| `AgentBridgeError` | client.ts | Thrown on bridge communication failure |
+| Connection refused | client.ts (net.connect) | Retries for `connectRetryMs` then throws |
+| Timeout | client.ts (setTimeout) | Throws after `timeoutMs` |
+| Invalid JSON | client.ts (JSON.parse) | Throws parse error |
+| `ok: false` response | Any bridge response | Wrapped in AgentBridgeError |
 
-## 8. Testing Strategy for Protocol
+Server catches all bridge errors and emits `run.failed` to the Socket.IO client.
 
-1. **Unit tests**: Mock the IPC socket. Send known JSON, assert correct
-   Socket.IO events are emitted.
-2. **Integration tests**: Spawn a mock Python bridge (simple script that
-   echoes fixed responses), verify full round-trip.
-3. **Contract tests**: Validate request/response JSON shapes against the
-   schemas above using zod or similar runtime validation.
+## 7. Testing Strategy
+
+| Test Type | Target | Mock |
+|---|---|---|
+| Bridge protocol contract | Request/response JSON shapes | Zod schemas + fixtures |
+| Bridge client unit | Connection, send, receive, timeout | net.createServer (local TCP) |
+| Chat run integration | Full event sequence | Mock AgentBridgeClient (returns fixtures) |
+| Gateway SSE parsing | Frame → event mapping | Mock HTTP server with canned SSE |
+| Socket.IO e2e | Browser event sequence | socket.io-client + mock bridge |

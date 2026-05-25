@@ -1,225 +1,265 @@
 # 03 — Frontend Design
 
-## 1. Technology Stack
+## 1. Framework Choice: Preact
 
-| Concern | Choice | Rationale |
-|---------|--------|-----------|
-| Bundler | Vite | Fast, modern, already used by hermes-web-ui |
-| Language | TypeScript | Type safety, IDE support |
-| UI framework | None (vanilla TS + DOM) | Minimal bundle, Primer handles layout |
-| CSS | Primer CSS (@primer/css) | GitHub's battle-tested design system; provides utility classes, components, and dark mode |
-| State | Module-scoped stores + CustomEvent | Simple, no library needed for single-user app |
-| Routing | History API wrapper (custom, ~50 LOC) | SPA with few routes; no need for vue-router |
-| Markdown | markdown-it + highlight.js + KaTeX | Essential for rendering AI responses |
-| Terminal | @xterm/xterm | Terminal emulation (inherited need) |
-| Real-time | socket.io-client | Chat streaming (must match server) |
-| Icons | Primer Octicons (@primer/octicons) | Matches Primer CSS aesthetic |
+**Decision**: Use Preact (not vanilla TS, not Vue, not React).
 
-## 2. Page Structure
+**Why not vanilla TS?**
+Chat streaming creates complex DOM lifecycle:
+- Message list that grows incrementally as `message.delta` events fire
+- Tool traces that appear/disappear with `tool.started`/`tool.completed`
+- Reasoning blocks that expand/collapse
+- Approval dialogs that pop up mid-stream
+- Session list that updates when new sessions are created
+
+Managing this with raw `document.createElement` means re-implementing a
+virtual DOM or maintaining brittle imperative update paths. Real apps of this
+complexity need a component model with lifecycle management.
+
+**Why Preact over React/Vue?**
+- **3KB** gzipped (vs React 40KB, Vue 33KB)
+- Full JSX + hooks API (familiar to any React developer)
+- `@preact/signals` for fine-grained reactivity (optional, 1KB)
+- Compatible with Vite out of the box
+- No ecosystem lock-in (Primer CSS is framework-agnostic)
+
+**Why not Vue (same as source)?**
+User specified "完全复刻重写前端" — a rewrite, not a port. Vue + Naive UI is
+what we're replacing. Preact + Primer CSS gives a completely different stack
+while staying lightweight.
+
+## 2. Technology Stack
+
+| Concern | Choice | Size |
+|---------|--------|------|
+| Rendering | Preact 10.x | 3KB |
+| Bundler | Vite 6.x | dev-only |
+| Styling | @primer/css 21.x | ~50KB (treeshakeable) |
+| Icons | @primer/octicons-react | tree-shaken |
+| Routing | preact-router | 3KB |
+| State | @preact/signals | 1KB |
+| Markdown | markdown-it + highlight.js + KaTeX | ~150KB (lazy-loaded) |
+| Terminal | @xterm/xterm | ~200KB (lazy-loaded, Phase 3 only) |
+| Real-time | socket.io-client | ~30KB |
+| HTTP | Native fetch (wrapper) | 0KB |
+
+Total initial bundle (Phase 1): ~90KB gzipped estimated.
+
+## 3. Page Structure (Phase 1 MVP only)
 
 ```
-/                         → Chat (default, redirects to last session or new)
+/                         → Chat (default session or new)
 /session/:id              → Chat with specific session
-/history                  → Session history / search
-/profiles                 → Profile management
-/skills                   → Skills management
-/plugins                  → Plugins
-/memory                   → Agent memory browser
-/models                   → Models & providers
-/files                    → File browser
-/terminal                 → Terminal
-/logs                     → Log viewer
-/jobs                     → Background jobs
-/settings                 → Runtime config
+/history                  → Session history list
 ```
 
-## 3. Layout
+Phase 2+ pages added incrementally (see doc 05).
+
+## 4. Layout
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ Sidebar (collapsible)  │  Main Content                  │
-│                        │                                 │
-│ [Chat]                 │  ┌─────────────────────────┐   │
-│ [History]              │  │  Page header / toolbar   │   │
-│ [Profiles]             │  ├─────────────────────────┤   │
-│ [Skills]               │  │                         │   │
-│ [Plugins]              │  │  Page content            │   │
-│ [Memory]               │  │                         │   │
-│ [Models]               │  │                         │   │
-│ [Files]                │  │                         │   │
-│ [Terminal]             │  │                         │   │
-│ [Logs]                 │  │                         │   │
-│ [Jobs]                 │  └─────────────────────────┘   │
-│ [Settings]             │                                 │
-└────────────────────────┴─────────────────────────────────┘
+│ Header: [≡] Rooster        [Profile ▾] [Model ▾] [◑]   │
+├────────────────────┬────────────────────────────────────┤
+│ Session List       │  Chat Area                         │
+│                    │                                     │
+│ [+ New]            │  ┌────────────────────────────┐    │
+│ ○ Session 1        │  │ Message bubble (assistant)  │    │
+│ ● Session 2 (act.) │  │ Message bubble (user)       │    │
+│ ○ Session 3        │  │ Streaming message...        │    │
+│                    │  │   └ [Tool trace]            │    │
+│                    │  │   └ [Reasoning]             │    │
+│                    │  └────────────────────────────┘    │
+│                    │                                     │
+│                    │  ┌────────────────────────────┐    │
+│                    │  │ [Input]            [Send ▶] │    │
+│                    │  └────────────────────────────┘    │
+└────────────────────┴────────────────────────────────────┘
 ```
 
-- Sidebar uses Primer's `ActionList` / `NavList` pattern
-- Main content area is a simple container that swaps per route
-- Responsive: sidebar collapses on mobile
+- Left panel: session list (collapsible on mobile)
+- Header: profile/model selectors, dark mode toggle
+- Main: chat messages + input
 
-## 4. Chat Page — Core UI
+## 5. Core Components (Phase 1)
 
-The chat page is the primary surface. Structure:
-
-```
-┌─────────────────────────────────────────────┐
-│ Session title        [Model] [Profile] [⚙]  │  ← Header bar
-├─────────────────────────────────────────────┤
-│                                             │
-│  [Assistant message with markdown]          │
-│                                             │
-│  [User message]                             │
-│                                             │
-│  [Assistant streaming...]                   │
-│    ├─ [Reasoning block, collapsible]        │
-│    ├─ [Tool use trace, collapsible]         │
-│    └─ [Response text, streaming]            │
-│                                             │
-├─────────────────────────────────────────────┤
-│ [Input area]                    [Send] [⏹]  │  ← Input bar
-│ [Attach file]                               │
-└─────────────────────────────────────────────┘
-```
-
-### Key Chat Components
-
-| Component | Responsibility |
-|-----------|---------------|
-| `ChatView` | Page-level container, manages session lifecycle |
-| `MessageList` | Scrollable message container, auto-scroll |
-| `MessageBubble` | Single message render (markdown, code, images) |
-| `ReasoningBlock` | Collapsible reasoning/thinking display |
-| `ToolTrace` | Tool call + result display (collapsible) |
-| `ChatInput` | Textarea + file attach + send/abort buttons |
-| `SessionHeader` | Session title, model selector, profile badge |
-
-### Streaming Behavior
-
-1. User sends message → `ChatInput` emits to Socket.IO
-2. Server streams back events via Socket.IO `/chat-run` namespace
-3. `MessageList` appends a streaming `MessageBubble` that grows as
-   `message.delta` events arrive
-4. Tool traces appear inline as `tool.started` / `tool.completed` events fire
-5. When `run.completed` fires, the message is finalized
-
-## 5. Primer CSS Usage
-
-Primer provides:
-- **Layout utilities**: `d-flex`, `flex-column`, `flex-1`, `overflow-auto`
-- **Spacing**: `p-3`, `m-2`, `gap-2`
-- **Colors**: `color-bg-default`, `color-fg-muted`, semantic tokens
-- **Components**: `Box`, `Button`, `ActionList`, `Dialog`, `FormControl`,
-  `Flash`, `Label`, `Spinner`, `Truncate`
-- **Dark mode**: Built-in via `data-color-mode` attribute
-
-Example — a message bubble:
-```html
-<div class="Box p-3 mb-2 color-bg-subtle rounded-2">
-  <div class="d-flex gap-2 mb-1">
-    <span class="Label Label--accent">assistant</span>
-    <span class="color-fg-muted text-small">2 min ago</span>
-  </div>
-  <div class="markdown-body">
-    <!-- rendered markdown content -->
-  </div>
-</div>
-```
+| Component | File | Responsibility |
+|-----------|------|---------------|
+| `App` | `pages/App.tsx` | Layout shell, router |
+| `ChatPage` | `pages/ChatPage.tsx` | Session lifecycle, connect Socket.IO |
+| `MessageList` | `components/MessageList.tsx` | Scrollable container, auto-scroll |
+| `MessageBubble` | `components/MessageBubble.tsx` | Single message: markdown + code |
+| `StreamingMessage` | `components/StreamingMessage.tsx` | Live-updating message during stream |
+| `ChatInput` | `components/ChatInput.tsx` | Textarea + send/abort buttons |
+| `SessionList` | `components/SessionList.tsx` | Left panel session navigator |
+| `Header` | `components/Header.tsx` | Profile/model selectors |
+| `ToolTrace` | `components/ToolTrace.tsx` | Collapsible tool call display |
 
 ## 6. State Management
 
-No framework store. Each feature module manages its own state:
+Using `@preact/signals` for reactive state:
 
 ```typescript
 // state/sessions.ts
-type Listener = () => void;
+import { signal, computed } from '@preact/signals'
+import type { Session } from '../types'
 
-let sessions: Session[] = [];
-const listeners = new Set<Listener>();
+export const sessions = signal<Session[]>([])
+export const activeSessionId = signal<string | null>(null)
 
-export function getSessions() { return sessions; }
+export const activeSession = computed(() =>
+  sessions.value.find(s => s.id === activeSessionId.value) ?? null
+)
 
-export function setSessions(next: Session[]) {
-  sessions = next;
-  listeners.forEach(fn => fn());
+// Actions
+export async function loadSessions() {
+  sessions.value = await api.get('/api/hermes/sessions')
 }
 
-export function subscribe(fn: Listener): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+export function setActiveSession(id: string) {
+  activeSessionId.value = id
 }
 ```
 
-Components subscribe on mount, unsubscribe on unmount. This is ~20 lines per
-store, zero dependencies, fully testable.
+Components automatically re-render when signals they read change. No
+subscriptions, no providers, no boilerplate.
 
-## 7. API Client
-
-Thin fetch wrapper:
-
-```typescript
-// api/client.ts
-const BASE = '';  // same-origin
-
-export async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new ApiError(res.status, await res.text());
-  return res.json();
-}
-
-export async function post<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) throw new ApiError(res.status, await res.text());
-  return res.json();
-}
-// ...put, del
-```
-
-## 8. Socket.IO Client
+## 7. Socket.IO Client
 
 ```typescript
 // ws/chat.ts
-import { io, Socket } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client'
+import { signal } from '@preact/signals'
 
-let socket: Socket | null = null;
+export const connected = signal(false)
+export const streaming = signal(false)
+
+let socket: Socket | null = null
 
 export function connect() {
-  socket = io('/chat-run', { transports: ['websocket'] });
-  socket.on('message.delta', handleDelta);
-  socket.on('tool.started', handleToolStarted);
-  socket.on('tool.completed', handleToolCompleted);
-  socket.on('run.completed', handleRunCompleted);
-  // ... other events
+  socket = io('/chat-run', { transports: ['websocket'] })
+  socket.on('connect', () => { connected.value = true })
+  socket.on('disconnect', () => { connected.value = false })
+  
+  // Chat events
+  socket.on('run.started', onRunStarted)
+  socket.on('message.delta', onMessageDelta)
+  socket.on('tool.started', onToolStarted)
+  socket.on('tool.completed', onToolCompleted)
+  socket.on('run.completed', onRunCompleted)
+  socket.on('run.failed', onRunFailed)
+  socket.on('abort.completed', onAbortCompleted)
+  socket.on('approval.requested', onApprovalRequested)
 }
 
-export function sendMessage(sessionId: string, content: string, opts: ChatOpts) {
-  socket?.emit('chat.send', { sessionId, content, ...opts });
+export function sendMessage(sessionId: string, input: string, opts?: {
+  model?: string
+  profile?: string
+}) {
+  socket?.emit('run', { sessionId, input, ...opts })
 }
 
 export function abort(sessionId: string) {
-  socket?.emit('chat.abort', { sessionId });
+  socket?.emit('abort', { sessionId })
 }
 ```
 
-## 9. Rendering Pipeline for AI Messages
+## 8. API Client
 
+```typescript
+// api/client.ts
+class ApiError extends Error {
+  constructor(public status: number, public body: string) {
+    super(`API ${status}: ${body}`)
+  }
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) throw new ApiError(res.status, await res.text())
+  return res.json()
+}
+
+export const api = {
+  get: <T>(path: string) => request<T>('GET', path),
+  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
+  put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
+  del: <T>(path: string) => request<T>('DELETE', path),
+}
 ```
-Raw content (string/blocks)
-  → markdown-it parse
-  → highlight.js for code blocks
-  → KaTeX for math ($...$, $$...$$)
-  → DOM output into .markdown-body container
+
+## 9. Markdown Rendering
+
+```typescript
+// lib/markdown.ts
+import MarkdownIt from 'markdown-it'
+import hljs from 'highlight.js'
+
+const md = new MarkdownIt({
+  html: false,
+  linkify: true,
+  highlight(str, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(str, { language: lang }).value
+    }
+    return ''
+  }
+})
+
+export function renderMarkdown(content: string): string {
+  return md.render(content)
+}
 ```
 
-Primer's `markdown-body` class provides GitHub-style markdown rendering
-(typography, tables, code blocks, blockquotes) out of the box.
+Primer's `.markdown-body` class applies GitHub-style typography.
+KaTeX loaded lazily only when `$` math delimiters detected.
 
-## 10. Dark Mode
+## 10. Primer CSS Usage
 
-Primer supports dark mode via `data-color-mode="dark"` on `<html>`.
-Toggle stored in `localStorage`, applied at page load before first paint
-(inline script in `index.html` to avoid flash).
+Primer provides utility classes + semantic tokens:
+
+```html
+<!-- Layout -->
+<div class="d-flex flex-column height-full">
+  <header class="Header">...</header>
+  <main class="d-flex flex-1 overflow-hidden">
+    <nav class="SideNav" style="width: 260px">...</nav>
+    <section class="flex-1 overflow-auto p-3">...</section>
+  </main>
+</div>
+
+<!-- Message bubble -->
+<div class="Box color-bg-subtle p-3 mb-2 rounded-2">
+  <div class="d-flex gap-2 mb-1">
+    <span class="Label Label--accent">assistant</span>
+    <span class="color-fg-muted f6">2 min ago</span>
+  </div>
+  <div class="markdown-body">...</div>
+</div>
+```
+
+## 11. Dark Mode
+
+Primer supports `data-color-mode="dark"` on `<html>`. Applied at page load
+via inline script (no flash):
+
+```html
+<script>
+  document.documentElement.dataset.colorMode =
+    localStorage.getItem('color-mode') || 'auto'
+</script>
+```
+
+## 12. Testing Strategy
+
+| Layer | Tool | Approach |
+|-------|------|----------|
+| Components | Preact Testing Library + vitest | Render, simulate events, assert DOM |
+| State (signals) | vitest | Direct signal manipulation + assertion |
+| API client | vitest + msw | Mock fetch responses |
+| Socket.IO client | vitest + mock socket | Emit events, assert state changes |
+| Markdown | vitest | Input → output snapshot tests |

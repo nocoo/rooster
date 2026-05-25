@@ -3,55 +3,77 @@
 ## 1. Project Goal
 
 Rooster is a web-based management panel for Hermes Agent. It is derived from
-[hermes-web-ui](https://github.com/EKKOLearnAI/hermes-web-ui) (v0.6.1) with
-a slimmer scope: **core chat + basic admin**, no social/collaboration features.
+[hermes-web-ui](https://github.com/EKKOLearnAI/hermes-web-ui) (v0.6.1,
+BSL-1.1 license) with a slimmer scope: **core chat + basic admin**, no
+social/collaboration features.
 
-## 2. Scope — Keep vs Strip
+## 2. Scope Classification
 
-### Kept (core)
+### MVP Must-Have (Phase 1)
 
 | Feature | Source |
 |---------|--------|
-| Chat (streaming, tool traces, reasoning display) | client chat views, server chat-run service |
-| Sessions (CRUD, search, history) | server sessions routes |
-| Profiles (manage agent configurations) | server profiles routes |
-| Skills management | server skills routes |
-| Plugins | server plugins routes |
-| Memory (agent memory browser) | server memory routes |
-| Models & Providers | server models/providers routes |
-| File browser / upload | server files routes |
-| Terminal (xterm.js) | server terminal WebSocket |
-| Logs viewer | server logs routes |
-| Jobs / Cron history | server jobs routes |
-| Settings / Config | server config routes |
-| Self-update | server update routes |
+| Chat (streaming, tool traces, reasoning) | run-chat service, Socket.IO |
+| Session list / history | sessions routes, session-store |
+| Profile selection (switch active profile) | profiles routes |
+| Model selection (switch model for chat) | models routes |
+| Agent status (bridge connected / disconnected) | health route, bridge manager |
 
-### Stripped
+### Phase 2 Candidate
+
+| Feature | Source |
+|---------|--------|
+| Reasoning/thinking block display | run-chat events |
+| Approval flow (tool permission dialogs) | run-chat approval events |
+| File attachment in chat | upload route |
+| Session search | sessions search route |
+| Session export | sessions export route |
+| Dark mode | Primer CSS built-in |
+| Context compression indicator | compression events |
+
+### Phase 3 Candidate (Admin)
+
+| Feature | Source |
+|---------|--------|
+| Profile management (full CRUD) | profiles routes |
+| Skills management | skills routes |
+| Plugins | plugins routes |
+| Memory browser | memory routes |
+| Models & providers config | models/providers routes |
+| File browser | files routes |
+| Terminal | terminal WebSocket |
+| Logs viewer | logs routes |
+| Jobs / cron history | jobs routes |
+| Runtime config / settings | config routes |
+| Self-update | update routes |
+
+### Explicitly Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Login / user management / JWT auth | Single-user panel; network-level access control only |
-| Kanban board | Collaboration feature, out of scope |
-| Group chat | Collaboration feature, out of scope |
-| API relay / proxy routing | External service feature |
-| Monitoring: skill usage, performance, token usage views | Low priority, can add later |
-| Voice / TTS | Not needed for MVP |
-| Video animation / ink-style effects | Cosmetic, stripped |
+| Login / user management / JWT auth | Single-user panel; network-level access only |
+| Kanban board | Collaboration feature |
+| Group chat | Collaboration feature |
+| API relay / proxy routing | External service |
+| Monitoring: skill usage, performance, token usage views | Not needed for MVP |
+| Voice / TTS | Not needed |
+| Video animation / ink-style effects | Cosmetic |
 | WeChat / channel integrations | Platform-specific |
-| Docker / Playwright | Not needed for MVP dev |
+| Docker / Playwright | Not needed for dev |
 
 ## 3. High-Level Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    Browser (SPA)                      │
-│          Vite + Vanilla TS + Primer CSS              │
+│            Vite + Preact + Primer CSS                │
 └──────────────┬────────────────────┬──────────────────┘
                │ REST (fetch)       │ Socket.IO (/chat-run)
                ▼                    ▼
 ┌─────────────────────────────────────────────────────┐
 │                  Rooster Server                       │
 │            Koa + Socket.IO + node:sqlite             │
+│            (inherited from hermes-web-ui)            │
 └──────────────┬────────────────────┬──────────────────┘
                │ IPC socket         │ HTTP proxy (SSE)
                ▼                    ▼
@@ -63,19 +85,20 @@ a slimmer scope: **core chat + basic admin**, no social/collaboration features.
 
 ## 4. Technology Stack
 
-| Layer | hermes-web-ui (current) | Rooster (target) |
+| Layer | hermes-web-ui (source) | Rooster (target) |
 |-------|------------------------|-------------------|
-| Frontend framework | Vue 3 + Naive UI | Vanilla TypeScript (no framework) |
-| Frontend bundler | Vite | Vite |
-| Frontend styling | Sass + Naive UI | Primer CSS (GitHub's design system) |
-| Frontend state | Pinia stores | Simple module-level state + custom events |
-| Server framework | Koa | Koa (inherited) |
-| Server DB | node:sqlite | node:sqlite (inherited) |
-| Real-time | Socket.IO | Socket.IO (inherited) |
-| Agent protocol | AgentBridge (IPC/TCP) + Gateway (HTTP/SSE) | Same (inherited) |
-| Auth | JWT (custom) | None (single-user, trusted network) |
+| Frontend framework | Vue 3 + Naive UI | **Preact** (3KB, JSX, hooks) |
+| Frontend bundler | Vite | Vite (same) |
+| Frontend styling | Sass + Naive UI components | **Primer CSS** (GitHub design system) |
+| Frontend state | Pinia stores | Preact signals or simple module state |
+| Server framework | Koa | Koa (inherited verbatim) |
+| Server DB | node:sqlite | node:sqlite (inherited verbatim) |
+| Real-time | Socket.IO | Socket.IO (inherited verbatim) |
+| Agent protocol | AgentBridge (IPC) + Gateway (SSE) | Same (inherited verbatim) |
+| Auth | JWT (custom HS256) | **None** (removed, trusted network) |
+| Package structure | Single-package monolith | **npm workspaces** |
 
-## 5. Monorepo Structure (Target)
+## 5. Monorepo Structure
 
 ```
 rooster/
@@ -83,47 +106,63 @@ rooster/
 │   ├── server/          # Koa server — inherited & cleaned
 │   │   ├── src/
 │   │   │   ├── index.ts
-│   │   │   ├── routes/          # Cleaned API routes
-│   │   │   ├── services/        # Business logic
-│   │   │   │   └── hermes/      # Agent bridge + gateway
-│   │   │   ├── db/              # SQLite schema + queries
-│   │   │   └── lib/             # Shared utils
-│   │   ├── tests/               # Unit + integration tests
-│   │   └── package.json
+│   │   │   ├── routes/
+│   │   │   │   ├── hermes/     # Kept routes (same paths)
+│   │   │   │   └── index.ts    # Route registration
+│   │   │   ├── services/
+│   │   │   │   └── hermes/     # run-chat, agent-bridge, gateway
+│   │   │   ├── db/
+│   │   │   │   └── hermes/     # session-store, schemas, etc.
+│   │   │   ├── controllers/
+│   │   │   │   └── hermes/     # Request handlers
+│   │   │   └── lib/            # Shared utils
+│   │   ├── tests/
+│   │   ├── package.json
+│   │   └── tsconfig.json
 │   └── client/          # Vite SPA — complete rewrite
 │       ├── src/
-│       │   ├── main.ts
-│       │   ├── pages/           # Page modules
-│       │   ├── components/      # Shared UI components
-│       │   ├── api/             # REST client
-│       │   ├── ws/              # Socket.IO client
-│       │   └── state/           # Lightweight state modules
+│       │   ├── main.tsx
+│       │   ├── pages/
+│       │   ├── components/
+│       │   ├── api/
+│       │   ├── ws/
+│       │   └── state/
 │       ├── index.html
-│       └── package.json
-├── docs/                # Design documents (this folder)
+│       ├── package.json
+│       └── tsconfig.json
+├── docs/                # Design documents
+├── NOTICE               # BSL-1.1 attribution
+├── LICENSE              # MIT (Rooster additions)
 ├── package.json         # Workspace root
-└── LICENSE
+└── vitest.config.ts     # Test config
 ```
 
 ## 6. Key Design Decisions
 
-1. **No frontend framework** — Primer CSS provides layout primitives and
-   components. TypeScript + DOM APIs keep the bundle minimal and the code
-   straightforward. If complexity grows, we can add a lightweight lib (Preact,
-   Lit) later.
+1. **Preact over vanilla TS** — Chat streaming with tool traces, reasoning
+   blocks, and approval dialogs creates complex DOM lifecycle. Preact gives
+   us JSX, hooks, and efficient diffing at 3KB. Primer CSS handles all
+   styling; Preact handles rendering. (See doc 03 §1 for rationale.)
 
-2. **No auth** — Rooster is a single-user admin panel running on a trusted
-   network. Removing auth simplifies the server significantly (no JWT, no
-   user table, no role checks).
+2. **No auth** — Single-user admin panel on trusted network. Default bind to
+   `127.0.0.1`. Remote access via reverse proxy with auth is the operator's
+   responsibility.
 
-3. **Server protocol cleanup** — The original server mixes REST verbs
-   inconsistently and has routes for stripped features. Rooster defines a
-   clean, minimal REST surface where every endpoint is independently testable
-   with plain HTTP (see doc 02).
+3. **Keep API paths unchanged** — All `/api/hermes/*` paths stay the same.
+   Only auth middleware is removed. This preserves any existing integrations.
 
 4. **Agent bridge untouched** — The IPC/TCP communication with the Python
-   bridge is the most complex and least visible part. We inherit it verbatim
-   to avoid breaking Hermes Agent compatibility.
+   bridge is inherited verbatim to maintain Hermes Agent compatibility.
 
-5. **Progressive enhancement** — Start with chat working end-to-end, then
-   layer admin features (profiles, skills, memory, etc.) incrementally.
+5. **npm workspaces** — Unlike the source monolith, Rooster uses proper
+   workspaces for clean dependency boundaries, independent testing, and
+   parallel builds.
+
+6. **BSL-1.1 compliance** — hermes-web-ui's license is preserved. NOTICE
+   file documents derivation. Rooster's own additions are MIT-licensed.
+
+## 7. Reference
+
+- Source: `~/workspace/reference/hermes-web-ui` (v0.6.1, commit `0eab6a1`)
+- Target: `~/workspace/personal/rooster`
+- Upstream: https://github.com/EKKOLearnAI/hermes-web-ui
