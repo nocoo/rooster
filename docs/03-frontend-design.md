@@ -30,11 +30,13 @@ while staying lightweight.
 
 ## 2. Technology Stack
 
+All dependencies use **latest stable** at time of project init (managed by bun).
+
 | Concern | Choice | Size |
 |---------|--------|------|
-| Rendering | Preact 10.x | 3KB |
-| Bundler | Vite 6.x | dev-only |
-| Styling | @primer/css 21.x | ~50KB (treeshakeable) |
+| Rendering | Preact | 3KB |
+| Bundler | Vite | dev-only |
+| Styling | @primer/css | ~50KB (treeshakeable) |
 | Icons | @primer/octicons (SVG, framework-agnostic) | tree-shaken |
 | Routing | preact-router | 3KB |
 | State | @preact/signals | 1KB |
@@ -157,11 +159,11 @@ export function sendMessage(sessionId: string, input: string, opts?: {
   model?: string
   profile?: string
 }) {
-  socket?.emit('run', { sessionId, input, ...opts })
+  socket?.emit('run', { session_id: sessionId, input, ...opts })
 }
 
 export function abort(sessionId: string) {
-  socket?.emit('abort', { sessionId })
+  socket?.emit('abort', { session_id: sessionId })
 }
 ```
 
@@ -256,6 +258,10 @@ via inline script (no flash):
 ```
 
 ## 12. Testing Strategy
+
+Coverage target: **95%+** (view layer in `pages/` and `components/` excluded
+from coverage threshold; all other client code — state, api, ws, lib — must
+meet the threshold).
 
 | Layer | Tool | Approach |
 |-------|------|----------|

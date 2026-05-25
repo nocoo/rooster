@@ -5,6 +5,17 @@
 Each phase is a shippable increment. Phase 1 is tightly scoped to a working
 chat that connects to Hermes Agent.
 
+## Constraints (apply to all phases)
+
+| Constraint | Rule |
+|-----------|------|
+| Package manager | **bun** (no npm/yarn lockfiles) |
+| Dependencies | Latest stable at time of implementation |
+| Pre-commit | ESLint strict (0 warnings) + tsc --noEmit + vitest (all pass) |
+| Coverage | 95%+ (server: no exclusions; client: `pages/` and `components/` excluded) |
+| Commits | Atomic, to local `main`, never auto-push |
+| Implementation | Clean-room from protocol spec; no hermes-web-ui code copied |
+
 ---
 
 ## Phase 1 — Chat MVP
@@ -19,55 +30,61 @@ chat that connects to Hermes Agent.
 - Can create new session, switch between sessions
 - Can select profile and model before sending
 
-### Server Tasks
+### Infrastructure Tasks
 
-1. Create npm workspace root (`package.json`, `vitest.config.ts`)
-2. Create `packages/server/package.json` with extracted dependencies
-3. Copy core server source from reference:
-   - `services/hermes/run-chat/` (all 16 files)
-   - `services/hermes/agent-bridge/` (all 5 files)
-   - `services/hermes/gateway-manager.ts`
-   - `db/` (index, hermes/init, schemas, session-store, sessions-db,
-     conversations-db, message-content, usage-store, compression-snapshot)
-   - `routes/health.ts`
-   - `routes/hermes/sessions.ts`, `chat-run.ts`, `profiles.ts`, `models.ts`,
-     `providers.ts`
-   - `controllers/hermes/sessions.ts`, `profiles.ts`, `models.ts`
-   - Supporting: logger, config, lib utils
-4. Remove auth middleware from route chain
-5. Remove user/group-chat/kanban/tts/media tables from `initAllHermesTables()`
-6. Set `BIND_HOST` default to `127.0.0.1`
-7. Register only Phase 1 routes in `routes/index.ts`:
+1. Create bun workspace root (`package.json`, `bunfig.toml`)
+2. Configure vitest with coverage thresholds (95%+)
+3. Configure ESLint flat config (strict, `--max-warnings 0`)
+4. Configure husky + lint-staged for pre-commit hooks
+5. Configure TypeScript (strict mode, path aliases)
 
-   | Registered (Phase 1) | Copied but NOT registered | Removed (never copied) |
-   |---------------------|--------------------------|------------------------|
-   | `healthRoutes` | `skillRoutes` | `authRoutes` |
-   | `sessionRoutes` | `pluginRoutes` | `kanbanRoutes` |
-   | `profileRoutes` | `memoryRoutes` | `groupChatRoutes` |
-   | `modelRoutes` | `configRoutes` | `ttsRoutes` |
-   | `providerRoutes` | `fileRoutes` | `mediaRoutes` |
-   | `chatRunSocket` (Socket.IO) | `downloadRoutes` | `performanceMonitorRoutes` |
-   | `uploadRoutes` | `logRoutes` | `weixinRoutes` |
-   | | `jobRoutes` | `proxyRoutes` |
-   | | `cronHistoryRoutes` | `codexAuthRoutes` |
-   | | `terminalRoutes` | `nousAuthRoutes` |
-   | | `updateRoutes` | `copilotAuthRoutes` |
-   | | | `xaiAuthRoutes` |
+### Server Tasks (Hono)
 
-   Phase 3 enables the "copied but not registered" routes one by one.
+1. Create `packages/server/package.json` (hono, socket.io, better-sqlite3, pino)
+2. Implement Hono app skeleton with error handling middleware
+3. Implement Agent Bridge client:
+   - IPC/TCP connection (JSON + newline protocol)
+   - Serialization lock
+   - `chat`, `get_output`, `ping` actions (minimum for chat)
+   - Timeout + reconnection logic
+4. Implement Session store (better-sqlite3):
+   - `sessions` + `messages` tables
+   - CRUD operations: create, get, list, delete
+5. Implement Socket.IO `/chat-run` namespace:
+   - `run` event handler → bridge chat + poll loop → emit events
+   - `abort` event handler → bridge interrupt
+   - `resume` event handler → session state recovery
+6. Implement Phase 1 REST routes:
 
+   | Route | Verb | Purpose |
+   |-------|------|---------|
+   | `/health` | GET | Server + bridge status |
+   | `/api/hermes/sessions` | GET | List sessions |
+   | `/api/hermes/sessions/:id` | GET | Get session detail |
+   | `/api/hermes/sessions/:id` | DELETE | Delete session |
+   | `/api/hermes/sessions/:id/rename` | POST | Rename session |
+   | `/api/hermes/sessions/conversations` | GET | List conversations |
+   | `/api/hermes/sessions/conversations/:id/messages` | GET | Get messages |
+   | `/api/hermes/sessions/conversations/:id/messages/paginated` | GET | Paginated messages |
+   | `/api/hermes/sessions/hermes` | GET | Hermes sessions |
+   | `/api/hermes/sessions/hermes/:id` | GET | Single hermes session |
+   | `/api/hermes/profiles` | GET | List profiles |
+   | `/api/hermes/models` | GET | List available models |
+   | `/api/hermes/providers` | GET | List providers |
+
+7. Set `BIND_HOST` default to `127.0.0.1`
 8. Verify server starts and responds to `/health`
-9. Write test: mock bridge → Socket.IO `run.started` + `message.delta` + `run.completed`
+9. Write tests: mock bridge → Socket.IO `run.started` + `message.delta` + `run.completed`
 
 ### Client Tasks
 
-1. Create `packages/client/package.json` (Vite, Preact, Primer CSS, socket.io-client)
+1. Create `packages/client/package.json` (vite, preact, @primer/css, socket.io-client)
 2. Vite config with Preact JSX transform
 3. `index.html` with Primer CSS link + dark mode inline script
 4. Layout shell: header + sidebar + main
 5. Session list component (fetch from `/api/hermes/sessions`)
 6. Chat page: message list + input + send
-7. Socket.IO client: connect, emit `run`, handle streaming events
+7. Socket.IO client: connect, emit `run` (with `session_id`), handle streaming events
 8. `MessageBubble` with markdown rendering (markdown-it + highlight.js)
 9. `ToolTrace` (collapsible)
 10. Profile/model selector in header
@@ -75,7 +92,7 @@ chat that connects to Hermes Agent.
 
 ### Deliverable
 
-Working chat with Hermes Agent. Start: `npm run dev`. Open browser. Chat.
+Working chat with Hermes Agent. Start: `bun run dev`. Open browser. Chat.
 
 ---
 
@@ -135,8 +152,8 @@ Working chat with Hermes Agent. Start: `npm run dev`. Open browser. Chat.
 
 | Phase | Scope | Estimate |
 |-------|-------|----------|
-| Phase 1 | Chat MVP (server strip + client rewrite) | 3–4 days |
-| Phase 2 | Chat polish (10 items) | 2–3 days |
+| Phase 1 | Chat MVP (server reimpl + client) | 4–5 days |
+| Phase 2 | Chat polish (11 items) | 2–3 days |
 | Phase 3 | Admin features (11 pages) | 4–6 days |
 | Phase 4 | Hardening | 1–2 days |
 

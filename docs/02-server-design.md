@@ -1,183 +1,118 @@
 # 02 — Server Design
 
-## 1. Inheritance Strategy
+## 1. Implementation Strategy
 
-The server is **inherited** from hermes-web-ui's `packages/server/src/` with
-surgical removal of stripped features. The core Hermes communication layer
-(AgentBridge, GatewayManager, run-chat) is kept verbatim. Routes are
-reorganized for clarity and testability.
+The server is a **clean-room reimplementation** of hermes-web-ui's behavior.
+No source code is copied. The reference repository is used solely to understand:
 
-**Important**: hermes-web-ui is a single-package monolith (no workspace).
-`packages/server/` is a source directory sharing the root `package.json`.
-Rooster will restructure into a proper npm workspace.
+- IPC/TCP protocol (Agent Bridge actions and response shapes)
+- Socket.IO event contract (event names, payload fields)
+- REST API paths and request/response shapes
+- Database schema (table structure and relationships)
 
-## 2. Source File Map (Precise Paths from Reference)
+**Framework**: Hono (lightweight, fast, TypeScript-native, Web Standard APIs).
+Replaces hermes-web-ui's Koa stack.
 
-### Core Services — Inherit Verbatim
+**Package manager**: bun (fast installs, native TS execution, workspace support).
 
-| Module | Source Path (reference) | Purpose |
-|--------|------------------------|---------|
-| run-chat/index.ts | `packages/server/src/services/hermes/run-chat/index.ts` | Chat run orchestrator + Socket.IO namespace |
-| run-chat/handle-bridge-run.ts | `.../run-chat/handle-bridge-run.ts` | Bridge chat execution loop |
-| run-chat/handle-api-run.ts | `.../run-chat/handle-api-run.ts` | Gateway/SSE chat execution |
-| run-chat/abort.ts | `.../run-chat/abort.ts` | Abort logic |
-| run-chat/bridge-delta.ts | `.../run-chat/bridge-delta.ts` | Incremental delta processing |
-| run-chat/bridge-message.ts | `.../run-chat/bridge-message.ts` | Bridge message formatting |
-| run-chat/compression.ts | `.../run-chat/compression.ts` | Context compression |
-| run-chat/content-blocks.ts | `.../run-chat/content-blocks.ts` | Content block parsing |
-| run-chat/message-format.ts | `.../run-chat/message-format.ts` | Message serialization |
-| run-chat/model-config.ts | `.../run-chat/model-config.ts` | Model configuration |
-| run-chat/response-stream.ts | `.../run-chat/response-stream.ts` | SSE response streaming |
-| run-chat/response-utils.ts | `.../run-chat/response-utils.ts` | Response helpers |
-| run-chat/session-command.ts | `.../run-chat/session-command.ts` | Session command handling |
-| run-chat/sse-utils.ts | `.../run-chat/sse-utils.ts` | SSE frame parsing |
-| run-chat/types.ts | `.../run-chat/types.ts` | Type definitions |
-| run-chat/usage.ts | `.../run-chat/usage.ts` | Token usage tracking |
-| agent-bridge/index.ts | `packages/server/src/services/hermes/agent-bridge/index.ts` | Module exports |
-| agent-bridge/client.ts | `.../agent-bridge/client.ts` | IPC/TCP bridge client |
-| agent-bridge/manager.ts | `.../agent-bridge/manager.ts` | Bridge process lifecycle |
-| agent-bridge/hermes_bridge.py | `.../agent-bridge/hermes_bridge.py` | Python bridge subprocess |
-| gateway-manager.ts | `packages/server/src/services/hermes/gateway-manager.ts` | Gateway process management |
+## 2. Module Architecture
 
-### Database Layer — Inherit with Selective Table Removal
+### Core Services (reimplemented)
 
-| Module | Source Path (reference) | Purpose | Keep? |
-|--------|------------------------|---------|-------|
-| db/index.ts | `packages/server/src/db/index.ts` | DB init, getDb() | ✓ |
-| db/hermes/init.ts | `.../db/hermes/init.ts` | Table initialization | ✓ (trimmed) |
-| db/hermes/schemas.ts | `.../db/hermes/schemas.ts` | All table schemas | ✓ (trimmed) |
-| db/hermes/session-store.ts | `.../db/hermes/session-store.ts` | Session CRUD | ✓ |
-| db/hermes/sessions-db.ts | `.../db/hermes/sessions-db.ts` | Session queries | ✓ |
-| db/hermes/conversations-db.ts | `.../db/hermes/conversations-db.ts` | Conversation/message queries | ✓ |
-| db/hermes/message-content.ts | `.../db/hermes/message-content.ts` | Message content handling | ✓ |
-| db/hermes/usage-store.ts | `.../db/hermes/usage-store.ts` | Token usage persistence | ✓ |
-| db/hermes/compression-snapshot.ts | `.../db/hermes/compression-snapshot.ts` | Compression state | ✓ |
-| db/hermes/users-store.ts | `.../db/hermes/users-store.ts` | User management | ✗ Remove |
+| Module | Responsibility |
+|--------|---------------|
+| `services/hermes/agent-bridge.ts` | IPC/TCP client to Hermes Agent bridge |
+| `services/hermes/chat-run/` | Chat orchestration: bridge polling loop, event emission |
+| `services/hermes/chat-run/socket.ts` | Socket.IO namespace `/chat-run` handler |
+| `services/hermes/chat-run/bridge-run.ts` | Bridge path: poll → parse events → emit |
+| `services/hermes/chat-run/gateway-run.ts` | Gateway path: SSE → parse → emit |
+| `services/hermes/chat-run/abort.ts` | Run abort logic |
+| `services/hermes/gateway.ts` | Gateway process management + SSE parsing |
+| `services/hermes/session-store.ts` | Session CRUD + message persistence |
 
-### Route Files — Keep / Remove Decision
+### Route Modules (Hono routers)
 
-| Route File | Source Path | Keep? | Notes |
-|-----------|------------|-------|-------|
-| routes/health.ts | `packages/server/src/routes/health.ts` | ✓ | |
-| routes/upload.ts | `.../routes/upload.ts` | ✓ | |
-| routes/update.ts | `.../routes/update.ts` | ✓ | |
-| routes/webhook.ts | `.../routes/webhook.ts` | ✓ | |
-| routes/hermes/chat-run.ts | `.../routes/hermes/chat-run.ts` | ✓ | Socket.IO getter/setter only |
-| routes/hermes/sessions.ts | `.../routes/hermes/sessions.ts` | ✓ | |
-| routes/hermes/profiles.ts | `.../routes/hermes/profiles.ts` | ✓ | |
-| routes/hermes/skills.ts | `.../routes/hermes/skills.ts` | ✓ | |
-| routes/hermes/plugins.ts | `.../routes/hermes/plugins.ts` | ✓ | |
-| routes/hermes/memory.ts | `.../routes/hermes/memory.ts` | ✓ | |
-| routes/hermes/models.ts | `.../routes/hermes/models.ts` | ✓ | |
-| routes/hermes/providers.ts | `.../routes/hermes/providers.ts` | ✓ | |
-| routes/hermes/config.ts | `.../routes/hermes/config.ts` | ✓ | |
-| routes/hermes/files.ts | `.../routes/hermes/files.ts` | ✓ | |
-| routes/hermes/download.ts | `.../routes/hermes/download.ts` | ✓ | |
-| routes/hermes/logs.ts | `.../routes/hermes/logs.ts` | ✓ | |
-| routes/hermes/jobs.ts | `.../routes/hermes/jobs.ts` | ✓ | |
-| routes/hermes/cron-history.ts | `.../routes/hermes/cron-history.ts` | ✓ | |
-| routes/hermes/terminal.ts | `.../routes/hermes/terminal.ts` | ✓ | |
-| routes/auth.ts | `.../routes/auth.ts` | ✗ | Auth removed |
-| routes/hermes/kanban.ts | `.../routes/hermes/kanban.ts` | ✗ | Stripped |
-| routes/hermes/kanban-events.ts | `.../routes/hermes/kanban-events.ts` | ✗ | Stripped |
-| routes/hermes/group-chat.ts | `.../routes/hermes/group-chat.ts` | ✗ | Stripped |
-| routes/hermes/tts.ts | `.../routes/hermes/tts.ts` | ✗ | Stripped |
-| routes/hermes/media.ts | `.../routes/hermes/media.ts` | ✗ | Stripped |
-| routes/hermes/performance-monitor.ts | `.../routes/hermes/performance-monitor.ts` | ✗ | Stripped |
-| routes/hermes/weixin.ts | `.../routes/hermes/weixin.ts` | ✗ | Stripped |
-| routes/hermes/proxy.ts | `.../routes/hermes/proxy.ts` | ✗ | Stripped |
-| routes/hermes/proxy-handler.ts | `.../routes/hermes/proxy-handler.ts` | ✗ | Stripped |
-| routes/hermes/codex-auth.ts | `.../routes/hermes/codex-auth.ts` | ✗ | Stripped |
-| routes/hermes/nous-auth.ts | `.../routes/hermes/nous-auth.ts` | ✗ | Stripped |
-| routes/hermes/copilot-auth.ts | `.../routes/hermes/copilot-auth.ts` | ✗ | Stripped |
-| routes/hermes/xai-auth.ts | `.../routes/hermes/xai-auth.ts` | ✗ | Stripped |
+| Module | Responsibility |
+|--------|---------------|
+| `routes/health.ts` | Health check, bridge status |
+| `routes/hermes/sessions.ts` | Session CRUD, conversations, messages |
+| `routes/hermes/profiles.ts` | Profile list, active profile |
+| `routes/hermes/models.ts` | Available models |
+| `routes/hermes/providers.ts` | Provider config |
+| `routes/hermes/skills.ts` | Skills management (Phase 3) |
+| `routes/hermes/plugins.ts` | Plugin management (Phase 3) |
+| `routes/hermes/memory.ts` | Memory browser (Phase 3) |
+| `routes/hermes/config.ts` | Runtime config (Phase 3) |
+| `routes/hermes/files.ts` | File browser (Phase 3) |
+| `routes/hermes/logs.ts` | Log viewer (Phase 3) |
+| `routes/hermes/jobs.ts` | Jobs + cron history (Phase 3) |
+| `routes/hermes/terminal.ts` | Terminal WebSocket (Phase 3) |
 
-## 3. API Route Map (Old → New)
+## 3. API Route Map
 
-All existing paths (`/api/hermes/*`) are preserved unchanged — no renaming.
-Routes are classified by registration phase:
+All paths match hermes-web-ui's contract (`/api/hermes/*`) for Hermes Agent
+compatibility. Routes are implemented incrementally by phase:
 
-- **Phase 1**: Registered and active from day one (chat MVP)
-- **Phase 3**: Source copied into repo but NOT registered in `routes/index.ts`
-  until the corresponding admin feature is enabled
-- **Removed**: Never copied (stripped features)
+- **Phase 1**: Chat MVP — minimum routes for chat + session + profile/model
+- **Phase 3**: Admin features — each route enabled as the feature ships
+- **Never implemented**: Stripped features (auth, kanban, group chat, etc.)
 
-| Current Route | Verb | Phase | Notes |
-|---|---|---|---|
-| `/health` | GET | 1 | |
-| `/upload` | POST | 1 | |
-| `/api/hermes/sessions` | GET | 1 | |
-| `/api/hermes/sessions/:id` | GET/DELETE | 1 | |
-| `/api/hermes/sessions/:id/rename` | POST | 1 | |
-| `/api/hermes/sessions/:id/model` | POST | 1 | |
-| `/api/hermes/sessions/:id/workspace` | POST | 1 | |
-| `/api/hermes/sessions/:id/export` | GET | 1 | |
-| `/api/hermes/sessions/:id/usage` | GET | 1 | |
-| `/api/hermes/sessions/conversations` | GET | 1 | |
-| `/api/hermes/sessions/conversations/:id/messages` | GET | 1 | |
-| `/api/hermes/sessions/conversations/:id/messages/paginated` | GET | 1 | |
-| `/api/hermes/sessions/batch-delete` | POST | 1 | |
-| `/api/hermes/sessions/hermes` | GET | 1 | |
-| `/api/hermes/sessions/hermes/:id` | GET | 1 | |
-| `/api/hermes/search/sessions` | GET | 1 | |
-| `/api/hermes/sessions/usage` | GET | 1 | |
-| `/api/hermes/sessions/context-length` | GET | 1 | |
-| `/api/hermes/workspace/folders` | GET | 1 | |
-| `/api/hermes/profiles` | GET/POST/PUT/DELETE | 1 | |
-| `/api/hermes/models` | GET | 1 | |
-| `/api/hermes/providers` | GET/PUT | 1 | |
-| `/api/hermes/skills` | GET/POST/DELETE | 3 | |
-| `/api/hermes/plugins` | GET/POST/DELETE | 3 | |
-| `/api/hermes/memory` | GET/DELETE | 3 | |
-| `/api/hermes/config` | GET/PUT | 3 | |
-| `/api/hermes/files` | GET | 3 | |
-| `/api/hermes/download` | GET | 3 | |
-| `/api/hermes/logs` | GET | 3 | |
-| `/api/hermes/jobs` | GET | 3 | |
-| `/api/hermes/cron-history` | GET | 3 | |
-| `/api/hermes/terminal` | WS | 3 | |
-| `/api/hermes/update` | POST | 3 | |
+| Route | Verb | Phase |
+|---|---|---|
+| `/health` | GET | 1 |
+| `/api/hermes/sessions` | GET | 1 |
+| `/api/hermes/sessions/:id` | GET/DELETE | 1 |
+| `/api/hermes/sessions/:id/rename` | POST | 1 |
+| `/api/hermes/sessions/conversations` | GET | 1 |
+| `/api/hermes/sessions/conversations/:id/messages` | GET | 1 |
+| `/api/hermes/sessions/conversations/:id/messages/paginated` | GET | 1 |
+| `/api/hermes/sessions/hermes` | GET | 1 |
+| `/api/hermes/sessions/hermes/:id` | GET | 1 |
+| `/api/hermes/profiles` | GET | 1 |
+| `/api/hermes/models` | GET | 1 |
+| `/api/hermes/providers` | GET | 1 |
+| Socket.IO `/chat-run` namespace | — | 1 |
+| `/api/hermes/search/sessions` | GET | 2 |
+| `/api/hermes/sessions/:id/export` | GET | 2 |
+| `/api/hermes/sessions/:id/usage` | GET | 2 |
+| `/api/hermes/sessions/batch-delete` | POST | 2 |
+| `/upload` | POST | 2 |
+| `/api/hermes/profiles` | POST/PUT/DELETE | 3 |
+| `/api/hermes/providers` | PUT | 3 |
+| `/api/hermes/skills` | GET/POST/DELETE | 3 |
+| `/api/hermes/plugins` | GET/POST/DELETE | 3 |
+| `/api/hermes/memory` | GET/DELETE | 3 |
+| `/api/hermes/config` | GET/PUT | 3 |
+| `/api/hermes/files` | GET | 3 |
+| `/api/hermes/download` | GET | 3 |
+| `/api/hermes/logs` | GET | 3 |
+| `/api/hermes/jobs` | GET | 3 |
+| `/api/hermes/cron-history` | GET | 3 |
+| `/api/hermes/terminal` | WS | 3 |
+| `/api/hermes/update` | POST | 3 |
 
-**Removed routes** (never copied): auth, kanban, kanban-events, group-chat,
-tts, media, performance-monitor, weixin, proxy, proxy-handler, codex-auth,
-nous-auth, copilot-auth, xai-auth.
+**Never implemented**: auth, kanban, group-chat, tts, media,
+performance-monitor, weixin, proxy, codex/nous/copilot/xai-auth.
 
-**Only change**: Remove JWT auth middleware from the route chain. All routes
-become publicly accessible (trusted network assumption).
+## 4. Database Schema
 
-## 4. Database Schema (Inherited — Keep / Remove)
+Using **better-sqlite3** (synchronous, well-tested, no native node:sqlite
+compatibility concerns).
 
-From `db/hermes/schemas.ts`:
+### Tables (Phase 1)
 
-### Tables to Keep (verbatim schema)
-
-| Table | Fields | Notes |
-|-------|--------|-------|
-| `sessions` | id, profile, source, user_id, model, provider, title, started_at, ended_at, end_reason, message_count, tool_call_count, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens, billing_provider, estimated_cost_usd, actual_cost_usd, cost_status, preview, last_active, workspace | Keep user_id field for future compatibility, just don't enforce |
-| `messages` | id, session_id, role, content, tool_call_id, tool_calls, tool_name, timestamp, token_count, finish_reason, reasoning, reasoning_details, reasoning_content | |
-| `session_usage` | id, session_id, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens, model, profile, created_at | |
-| `chat_compression_snapshots` | session_id, summary, last_message_index, message_count_at_time, updated_at | |
-| `model_context` | id, provider, model, context_limit | |
-
-### Tables to Remove
-
-| Table | Reason |
+| Table | Fields |
 |-------|--------|
-| `users` | No auth |
-| `user_profiles` | No auth |
-| `gc_rooms` | Group chat stripped |
-| `gc_messages` | Group chat stripped |
-| `gc_room_agents` | Group chat stripped |
-| `gc_context_snapshots` | Group chat stripped |
-| `gc_room_members` | Group chat stripped |
-| `gc_pending_session_deletes` | Group chat stripped |
-| `gc_session_profiles` | Group chat stripped |
+| `sessions` | id, profile, source, model, provider, title, started_at, ended_at, end_reason, message_count, tool_call_count, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens, estimated_cost_usd, preview, last_active, workspace |
+| `messages` | id, session_id, role, content, tool_call_id, tool_calls, tool_name, timestamp, token_count, finish_reason, reasoning, reasoning_details, reasoning_content |
+| `session_usage` | id, session_id, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens, model, profile, created_at |
+| `chat_compression_snapshots` | session_id, summary, last_message_index, message_count_at_time, updated_at |
+| `model_context` | id, provider, model, context_limit |
 
-### Migration Approach
+**Not implemented**: users, user_profiles, gc_* tables (stripped features).
 
-Since Rooster starts fresh (no existing data), we simply omit the removed
-tables from `initAllHermesTables()`. No migration needed. The `syncTable()`
-utility is inherited as-is for future schema evolution.
+Note: `user_id` field removed from `sessions` (no auth system). Schema is
+authored fresh — not inherited from hermes-web-ui's `schemas.ts`.
 
 ## 5. Security: Default Bind Address
 
@@ -187,53 +122,72 @@ If operators want remote access, they must explicitly set `BIND_HOST=0.0.0.0`
 and are responsible for placing a reverse proxy (nginx/caddy) with
 authentication in front.
 
-The docs and startup banner will print a warning when `BIND_HOST` is not
-localhost:
+The startup banner will print a warning when `BIND_HOST` is not localhost:
 
 ```
 ⚠ Rooster is binding to 0.0.0.0 — ensure access is restricted via
   reverse proxy or firewall. No authentication is built in.
 ```
 
-## 6. Testability Matrix
+## 6. Quality Gates
+
+### Pre-commit Hooks
+
+| Check | Tool | Threshold |
+|-------|------|-----------|
+| Lint | eslint (flat config, strict) | 0 warnings, 0 errors |
+| Type check | tsc --noEmit | 0 errors |
+| Unit tests | vitest | All pass |
+| Coverage | vitest + v8 | 95%+ (server package) |
+
+### Coverage Policy
+
+- **Server**: 95%+ line coverage, no exclusions
+- **Client**: 95%+ line coverage, `pages/` and `components/` (view layer) excluded
+- Coverage threshold enforced in `vitest.config.ts` — failing coverage blocks commit
+
+### Lint Configuration
+
+ESLint flat config with strict rules:
+- `@typescript-eslint/strict-type-checked`
+- No `any` without explicit cast
+- No unused variables/imports
+- Consistent return types
+- Zero warnings tolerance (warnings treated as errors via `--max-warnings 0`)
+
+## 7. Testability Matrix
 
 | Layer | What to Test | How | Dependencies |
 |-------|-------------|-----|-------------|
-| **HTTP routes** | Request/response shape, status codes | Supertest + Koa app instance | Inject mock services |
+| **HTTP routes** | Request/response shape, status codes | Hono test client (`app.request()`) | Inject mock services |
 | **Session store** | CRUD, search, pagination | Direct function calls | In-memory SQLite (`:memory:`) |
-| **Chat run (Socket.IO)** | Event sequence, streaming | `socket.io-client` test client | Mock AgentBridgeClient |
-| **AgentBridge client** | JSON send/receive, timeout, reconnect | Mock TCP server (net.createServer) | No real Hermes Agent |
+| **Chat run (Socket.IO)** | Event sequence, streaming | `socket.io-client` test client | Mock bridge client |
+| **Agent bridge client** | JSON send/receive, timeout, reconnect | Mock TCP server (net.createServer) | No real Hermes Agent |
 | **Bridge protocol** | Request/response schema validation | Zod schema + snapshot tests | Static JSON fixtures |
 | **Gateway proxy** | SSE frame parsing, error handling | Mock HTTP server with SSE | No real gateway |
 
-### CI/Dev Verification (No Real Hermes Agent Required)
+### Dev Commands
 
 ```
-npm test                  # All unit + integration tests
-npm run test:bridge       # Bridge protocol contract tests (mock socket)
-npm run test:chat         # Socket.IO chat flow (mock bridge)
-npm run test:routes       # HTTP route tests (in-memory DB)
+bun test                  # All unit + integration tests
+bun test:coverage         # With coverage report + threshold check
+bun run lint              # ESLint strict (0 warnings)
+bun run typecheck         # tsc --noEmit
 ```
 
-## 7. License / Notice
+## 8. License
 
-hermes-web-ui is licensed BSL-1.1 (Business Source License 1.1). Per BSL-1.1
-terms:
+Rooster is an independent MIT-licensed project. No source code is copied from
+hermes-web-ui. The reference repository is used solely to understand the
+protocol and behavior for reimplementation.
 
-- Source code can be copied and modified for internal/non-production use
-- Root `LICENSE` file is BSL-1.1 (covers the inherited server code which
-  dominates the codebase)
-- `package.json` will reference the upstream origin
-- If Rooster is distributed or offered as a service, BSL-1.1 change date
-  and production use terms apply
+```
+// LICENSE
+MIT License
+Copyright (c) 2026 ...
+```
 
-New files authored for Rooster (client rewrite, new utilities) carry per-file
-`SPDX-License-Identifier: MIT` headers. `NOTICE` file at repo root documents
-the derivation and dual-license boundary.
-
-## 8. Package Structure
-
-Rooster uses **npm workspaces** (unlike hermes-web-ui's monolith):
+## 9. Package Structure
 
 ```json
 // root package.json
@@ -242,21 +196,20 @@ Rooster uses **npm workspaces** (unlike hermes-web-ui's monolith):
   "private": true,
   "workspaces": ["packages/*"],
   "scripts": {
-    "dev": "npm run dev --workspace=packages/server",
-    "build": "npm run build --workspace=packages/server && npm run build --workspace=packages/client",
-    "test": "vitest run"
+    "dev": "bun run --filter ./packages/server dev",
+    "build": "bun run --filter '*' build",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky"
   }
 }
 ```
 
-Each package (`packages/server/package.json`, `packages/client/package.json`)
-declares its own dependencies. This enables:
-- Independent versioning
-- Separate test configs
-- Clean dependency boundaries
-- Parallel builds
+Each package declares its own dependencies (latest stable at time of init).
 
-## 9. Configuration
+## 10. Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
