@@ -50,15 +50,27 @@ describe('db', () => {
       const b = getDb(':memory:')
       expect(a).toBe(b)
     })
+
+    it('should use ROOSTER_DB_PATH env var when no path given', () => {
+      closeDb()
+      process.env['ROOSTER_DB_PATH'] = ':memory:'
+      const instance = getDb()
+      expect(instance).toBeDefined()
+      delete process.env['ROOSTER_DB_PATH']
+    })
   })
 
   describe('closeDb', () => {
     it('should close and reset the singleton', () => {
       getDb(':memory:')
       closeDb()
-      // After close, getDb should create a new instance
       const fresh = getDb(':memory:')
       expect(fresh).toBeDefined()
+    })
+
+    it('should no-op when no db is open', () => {
+      closeDb()
+      closeDb()
     })
   })
 })

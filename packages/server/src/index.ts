@@ -1,6 +1,10 @@
 import { serve } from '@hono/node-server'
 import { logger } from './lib/logger.js'
-import { app } from './app.js'
+import { createApp } from './app.js'
+import { getDb } from './services/hermes/db.js'
+import { getBridgeClient } from './services/hermes/agent-bridge.js'
+
+const app = createApp({ db: getDb(), bridge: getBridgeClient() })
 
 const port = parseInt(process.env['PORT'] ?? '8648', 10)
 const host = process.env['BIND_HOST'] ?? '127.0.0.1'
