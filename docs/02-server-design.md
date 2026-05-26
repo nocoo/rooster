@@ -157,16 +157,15 @@ ESLint flat config with strict rules:
 | **Session store** | CRUD, search, pagination | Direct function calls | In-memory SQLite (`:memory:`) |
 | **Chat run (Socket.IO)** | Event sequence, streaming | `socket.io-client` test client | Mock bridge client |
 | **Agent bridge client** | JSON send/receive, timeout, reconnect | Mock TCP server (net.createServer) | No real Hermes Agent |
-| **Bridge protocol** | Request/response schema validation | Zod schema + snapshot tests | Static JSON fixtures |
-| **Gateway proxy** | SSE frame parsing, error handling | Mock HTTP server with SSE | No real gateway |
 
 ### Dev Commands
 
 ```
+bun run dev               # Start server + client concurrently
 bun run test              # All unit + integration tests (vitest)
 bun run test:coverage     # With coverage report + threshold check
 bun run lint              # ESLint strict (0 warnings)
-bun run typecheck         # tsc --noEmit
+bun run typecheck         # tsc --noEmit (server + client + root)
 ```
 
 ## 8. License

@@ -77,9 +77,9 @@ IPC/Socket.IO protocol and API contract.
 │                  Rooster Server                       │
 │        Hono + Socket.IO + better-sqlite3             │
 │         (reimplemented from protocol spec)           │
-└──────────────┬────────────────────┬──────────────────┘
-               │ IPC socket         │ HTTP proxy (SSE)
-               ▼                    ▼
+└──────────────────────────┬──────────────────────────┘
+                           │ IPC socket (JSON + newline)
+                           ▼
 ┌─────────────────────────────────────────────────────┐
 │                   Hermes Agent                        │
 │         (Python, managed externally)                 │
@@ -97,7 +97,7 @@ IPC/Socket.IO protocol and API contract.
 | Server framework | Koa | **Hono** (lightweight, Web Standard APIs) |
 | Server DB | node:sqlite | **better-sqlite3** (synchronous, well-tested) |
 | Real-time | Socket.IO | **Socket.IO** (protocol-compatible) |
-| Agent protocol | AgentBridge (IPC) + Gateway (SSE) | Reimplemented to match protocol spec |
+| Agent protocol | AgentBridge (IPC) + Gateway (SSE) | **AgentBridge IPC only** (Phase 1); Gateway SSE planned for future |
 | Auth | JWT (custom HS256) | **None** (trusted network) |
 | Package manager | npm | **bun** |
 | Package structure | Single-package monolith | **bun workspaces** |

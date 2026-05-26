@@ -2,11 +2,11 @@
 
 ## 1. Overview
 
-Rooster reimplements two communication paths to be wire-compatible with
-Hermes Agent:
+Rooster's communication with Hermes Agent uses the **Agent Bridge** protocol
+(IPC/TCP socket). This is the only path implemented in Phase 1.
 
-1. **Agent Bridge** (IPC/TCP socket) — primary path for chat runs
-2. **Gateway Proxy** (HTTP/SSE) — alternative API-compatible path
+1. **Agent Bridge** (IPC/TCP socket) — primary path for chat runs (**implemented**)
+2. **Gateway Proxy** (HTTP/SSE) — alternative API-compatible path (**future, not Phase 1**)
 
 This document specifies the protocol contract that Rooster must implement.
 Field names, action strings, and event payloads are derived from observation
@@ -202,10 +202,11 @@ they use camelCase (`inputTokens`, `outputTokens`, `contextTokens`).
 | Agent generic | `agent.event` |
 | Session | `resumed` |
 
-## 4. Gateway Proxy (HTTP/SSE)
+## 4. Gateway Proxy (HTTP/SSE) — NOT IMPLEMENTED (Future)
 
-When a profile has a gateway configured, the server proxies requests to its
-OpenAI-compatible endpoint.
+> **Status**: Documented for reference only. Not implemented in Phase 1.
+> When a profile has a gateway configured, the server would proxy requests to
+> its OpenAI-compatible endpoint. This will be implemented in a future phase.
 
 ### Upstream Endpoint
 
@@ -226,7 +227,7 @@ event: response.completed
 data: {"type":"response.completed","response":{...}}
 ```
 
-The server reads SSE frames and re-emits them as Socket.IO events to the
+The server would read SSE frames and re-emit them as Socket.IO events to the
 browser client.
 
 ## 5. Data Flow
@@ -236,16 +237,16 @@ Browser
   │ emit('run', {session_id, input, model, profile})
   ▼
 Socket.IO Server (/chat-run namespace)
-  │ decides bridge vs gateway based on profile config
   │
-  ├─[Bridge path]──→ bridge.chat({session_id, message, ...})
-  │                    └─→ bridge.getOutput(run_id, cursor, event_cursor)
-  │                    └─→ Poll loop: parse events, emit to socket
-  │                    └─→ Until chunk.done === true
-  │
-  └─[Gateway path]─→ fetch(GATEWAY_HOST/v1/responses, {stream:true})
-                       └─→ Parse SSE frames → emit to socket
+  └─[Bridge path]──→ bridge.chat({session_id, message, ...})
+                       └─→ bridge.getOutput(run_id, cursor, event_cursor)
+                       └─→ Poll loop: parse events, emit to socket
+                       └─→ Until chunk.done === true
 ```
+
+> **Future**: Gateway path (`fetch(GATEWAY_HOST/v1/responses, {stream:true})
+> → Parse SSE frames → emit to socket`) will be added when gateway support
+> ships.
 
 ## 6. Error Handling
 
@@ -261,10 +262,10 @@ Socket.IO Server (/chat-run namespace)
 
 ## 7. Testing Strategy
 
-| Test Type | Target | Approach |
-|---|---|---|
-| Bridge protocol contract | Request/response JSON shapes | Zod schemas + snapshot tests |
-| Bridge client unit | Connection, send, receive, timeout | Mock TCP server (net.createServer) |
-| Chat run integration | Full event sequence | Mock bridge client (returns fixtures) |
-| Gateway SSE parsing | Frame → event mapping | Mock HTTP server with canned SSE |
-| Socket.IO e2e | Browser event sequence | socket.io-client + mock bridge |
+| Test Type | Target | Approach | Status |
+|---|---|---|---|
+| Bridge protocol contract | Request/response JSON shapes | Zod schemas + snapshot tests | Phase 1 |
+| Bridge client unit | Connection, send, receive, timeout | Mock TCP server (net.createServer) | Phase 1 |
+| Chat run integration | Full event sequence | Mock bridge client (returns fixtures) | Phase 1 |
+| Gateway SSE parsing | Frame → event mapping | Mock HTTP server with canned SSE | **Future** |
+| Socket.IO e2e | Browser event sequence | socket.io-client + mock bridge | Phase 1 |
