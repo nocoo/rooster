@@ -13,11 +13,17 @@ vi.mock('../src/api/sessions.js', () => ({
   renameSession: vi.fn().mockResolvedValue(undefined),
 }))
 
+const mockRoute = vi.fn()
+vi.mock('preact-router', () => ({
+  route: (...args: unknown[]) => mockRoute(...args) as unknown,
+}))
+
 describe('SessionList', () => {
   beforeEach(() => {
     sessions.value = []
     activeSessionId.value = null
     messages.value = []
+    mockRoute.mockClear()
   })
 
   it('should show empty message when no sessions', () => {
@@ -36,14 +42,14 @@ describe('SessionList', () => {
     expect(screen.getByText('s2'.slice(0, 8))).toBeTruthy()
   })
 
-  it('should set active session on click', () => {
+  it('should navigate to /session/:id on click', () => {
     sessions.value = [
       { id: 's1', title: 'Test', started_at: '2025-01-01', last_active: new Date().toISOString() },
     ]
 
     render(<SessionList />)
     fireEvent.click(screen.getByText('Test'))
-    expect(activeSessionId.value).toBe('s1')
+    expect(mockRoute).toHaveBeenCalledWith('/session/s1')
   })
 
   it('should highlight active session', () => {

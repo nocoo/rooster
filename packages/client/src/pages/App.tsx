@@ -24,7 +24,7 @@ function HomePage(_props: { path: string }) {
   )
 }
 
-export function App() {
+export function App({ url }: { url?: string }) {
   useEffect(() => {
     void loadSessions()
   }, [])
@@ -40,7 +40,7 @@ export function App() {
         <nav class="border-right" style={{ width: '260px', overflowY: 'auto' }}>
           <SessionList />
         </nav>
-        <Router>
+        <Router {...(url ? { url } : {})}>
           <HomePage path="/" />
           <ChatPage path="/session/:id" />
         </Router>

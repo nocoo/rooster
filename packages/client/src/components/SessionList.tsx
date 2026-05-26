@@ -1,4 +1,5 @@
-import { sessions, activeSessionId, setActiveSession, removeSession } from '../state/sessions.js'
+import { route } from 'preact-router'
+import { sessions, activeSessionId, removeSession } from '../state/sessions.js'
 
 export function SessionList() {
   const items = sessions.value
@@ -21,7 +22,7 @@ export function SessionList() {
             <button
               class="ActionList-content"
               type="button"
-              onClick={() => { setActiveSession(session.id) }}
+              onClick={() => { route(`/session/${session.id}`) }}
             >
               <span class="ActionList-item-label text-truncate">
                 {session.title ?? session.id.slice(0, 8)}
