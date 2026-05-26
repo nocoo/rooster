@@ -207,7 +207,7 @@ Each package declares its own dependencies (latest stable at time of init).
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PORT` | `8648` | Server listen port |
+| `PORT` | `7038` | Server listen port |
 | `BIND_HOST` | `127.0.0.1` | Bind address (**localhost by default**) |
 | `HERMES_AGENT_BRIDGE_ENDPOINT` | `/tmp/hermes-agent-bridge.sock` | Agent bridge IPC socket path (also accepts `tcp://host:port` or `ipc://path`) |
 | `LOG_LEVEL` | `info` | pino log level |
