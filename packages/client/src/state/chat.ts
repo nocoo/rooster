@@ -151,7 +151,7 @@ export function initChat(): void {
   connect()
 }
 
-export function send(input: string, opts?: { model?: string; profile?: string; provider?: string }): void {
+export function send(input: string, opts?: { model?: string; profile?: string; provider?: string; attachments?: Array<{ id: string; original_name: string; mime_type: string; size: number }> }): void {
   if (anySessionWorking.value) return
   const sessionId = activeSessionId.value ?? uuid()
 
@@ -187,10 +187,11 @@ export function send(input: string, opts?: { model?: string; profile?: string; p
     clarify: null,
   })
 
-  const payload: Record<string, string> = { input, session_id: sessionId }
+  const payload: Record<string, unknown> = { input, session_id: sessionId }
   if (opts?.model) payload['model'] = opts.model
   if (opts?.profile) payload['profile'] = opts.profile
   if (opts?.provider) payload['provider'] = opts.provider
+  if (opts?.attachments && opts.attachments.length > 0) payload['attachments'] = opts.attachments
 
   sendRun(payload as Parameters<typeof sendRun>[0])
 }

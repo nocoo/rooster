@@ -559,6 +559,64 @@ html, body, #app {
   border-radius: 8px;
 }
 
+/* Attachment chips */
+.attachment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  border: 1px solid var(--borderColor-default, var(--color-border-default));
+  background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
+}
+
+.attachment-chip--uploading {
+  opacity: 0.6;
+}
+
+.attachment-chip--error {
+  border-color: var(--borderColor-danger-muted, var(--color-danger-muted));
+  background: var(--bgColor-danger-muted, var(--color-danger-subtle));
+}
+
+.attachment-chip-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-chip-size {
+  color: var(--fgColor-muted, var(--color-fg-muted));
+}
+
+.attachment-chip-error {
+  color: var(--fgColor-danger, var(--color-danger-fg));
+  font-size: 11px;
+}
+
+.attachment-chip-remove {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--fgColor-muted, var(--color-fg-muted));
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.attachment-chip-remove:hover {
+  color: var(--fgColor-danger, var(--color-danger-fg));
+}
+
 /* Responsive: narrow screens */
 @media (max-width: 768px) {
   .app-sidebar {

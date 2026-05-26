@@ -229,6 +229,7 @@ export function sendRun(payload: {
   provider?: string
   instructions?: string
   source?: string
+  attachments?: Array<{ id: string; original_name: string; mime_type: string; size: number }>
 }): void {
   socket?.emit('run', payload)
 }
