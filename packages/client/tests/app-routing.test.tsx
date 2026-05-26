@@ -19,6 +19,12 @@ vi.mock('socket.io-client', () => ({
   io: vi.fn(() => ({ on: vi.fn(), emit: vi.fn(), disconnect: vi.fn() })),
 }))
 
+vi.mock('../src/api/settings.js', () => ({
+  fetchProfiles: vi.fn().mockResolvedValue([]),
+  fetchModels: vi.fn().mockResolvedValue([]),
+  fetchProviders: vi.fn().mockResolvedValue([]),
+}))
+
 describe('App routing integration', () => {
   beforeEach(() => {
     activeSessionId.value = null
