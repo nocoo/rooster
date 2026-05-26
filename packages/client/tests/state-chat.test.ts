@@ -242,6 +242,22 @@ describe('state/chat', () => {
       expect(messages.value[0]?.content).toBe('accumulated content')
     })
 
+    it('handleRunCompleted should persist reasoning in assistant message', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'answer', reasoning: 'Let me think step by step', reasoningDone: true, tools: [], agentEvents: [], error: null } }
+      h['onRunCompleted']({ event: 'run.completed', session_id: 's1', run_id: 'r1', output: 'answer' })
+      expect(messages.value[0]?.reasoning).toBe('Let me think step by step')
+    })
+
+    it('handleRunCompleted should omit reasoning when empty', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'answer', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      h['onRunCompleted']({ event: 'run.completed', session_id: 's1', run_id: 'r1', output: 'answer' })
+      expect(messages.value[0]?.reasoning).toBeUndefined()
+    })
+
     it('handleRunFailed should set error and preserve partial output', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()

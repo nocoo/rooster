@@ -5,7 +5,7 @@ interface ReasoningBlockProps {
 }
 
 export function ReasoningBlock({ reasoning, done, streaming }: ReasoningBlockProps) {
-  if (!reasoning && !streaming) return null
+  if (!reasoning) return null
 
   const isExpanded = !done || streaming
 

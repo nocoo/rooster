@@ -74,6 +74,7 @@ export async function executeBridgeRun(
   let cursor = 0
   let eventCursor = 0
   let output = ''
+  let reasoning = ''
 
   while (!signal.aborted) {
     const chunk: AgentBridgeOutput = await bridge.getOutput(runId, cursor, eventCursor)
@@ -90,6 +91,10 @@ export async function executeBridgeRun(
     }
 
     for (const evt of chunk.events) {
+      const evtType = str(evt['event']) || str(evt['type'])
+      if (evtType === 'reasoning.delta' || evtType === 'thinking.delta') {
+        reasoning += str(evt['text'])
+      }
       emitBridgeEvent(emitter, sessionId, runId, evt)
     }
 
@@ -110,11 +115,13 @@ export async function executeBridgeRun(
           output,
         })
       } else {
-        messageStore.append({
+        const appendInput: Parameters<typeof messageStore.append>[0] = {
           session_id: sessionId,
           role: 'assistant',
           content: output,
-        })
+        }
+        if (reasoning) appendInput.reasoning = reasoning
+        messageStore.append(appendInput)
         sessionStore.updateLastActive(sessionId)
 
         emitter.emit('run.completed', {

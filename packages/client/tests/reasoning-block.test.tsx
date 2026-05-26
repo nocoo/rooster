@@ -47,9 +47,8 @@ describe('ReasoningBlock', () => {
     expect(screen.getByText('Let me think about this')).toBeTruthy()
   })
 
-  it('should render when streaming even with empty reasoning', () => {
+  it('should not render when streaming with empty reasoning', () => {
     const { container } = render(<ReasoningBlock reasoning="" done={false} streaming={true} />)
-    expect(container.querySelector('.reasoning-block')).toBeTruthy()
-    expect(screen.getByText('Thinking…')).toBeTruthy()
+    expect(container.querySelector('.reasoning-block')).toBeNull()
   })
 })

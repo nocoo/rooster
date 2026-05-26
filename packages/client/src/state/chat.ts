@@ -182,6 +182,7 @@ function handleRunCompleted(payload: RunCompletedPayload): void {
     session_id: payload.session_id,
     role: 'assistant',
     content: finalOutput,
+    ...(state.reasoning ? { reasoning: state.reasoning } : {}),
     timestamp: new Date().toISOString(),
   }
 

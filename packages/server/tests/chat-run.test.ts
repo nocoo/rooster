@@ -469,6 +469,60 @@ describe('Socket.IO /chat-run', () => {
       expect(events[0]?.['text']).toBe('thinking...')
       expect(events[1]?.['event']).toBe('reasoning.available')
     })
+
+    it('should persist reasoning to assistant message in store', async () => {
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'think hard', session_id: 'sess-reason-persist' })
+        })
+      })
+
+      const msgs = messageStore.list('sess-reason-persist')
+      const assistant = msgs.find((m) => m.role === 'assistant')
+      expect(assistant).toBeDefined()
+      expect(assistant?.reasoning).toBe('thinking...')
+    })
+
+    it('should persist thinking.delta events as reasoning', async () => {
+      client.disconnect()
+      await ioServer.close()
+      await new Promise<void>((resolve) => { httpServer.close(() => { resolve() }) })
+
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'thinking.delta', text: 'deep thought' }],
+            done: false,
+          },
+          {
+            delta: 'Result',
+            output: 'Result',
+            cursor: 2,
+            event_cursor: 1,
+            events: [],
+            done: true,
+          },
+        ],
+      }))
+      connectClient()
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'think', session_id: 'sess-thinking-persist' })
+        })
+      })
+
+      const msgs = messageStore.list('sess-thinking-persist')
+      const assistant = msgs.find((m) => m.role === 'assistant')
+      expect(assistant).toBeDefined()
+      expect(assistant?.reasoning).toBe('deep thought')
+    })
   })
 
   describe('run — generic agent events', () => {
