@@ -14,6 +14,7 @@ import {
   type RunFailedPayload,
   type ToolStartedPayload,
   type ToolCompletedPayload,
+  type AbortStartedPayload,
   type AbortCompletedPayload,
   type ReasoningDeltaPayload,
   type ThinkingDeltaPayload,
@@ -132,6 +133,7 @@ export function initChat(): void {
     onRunFailed: handleRunFailed,
     onToolStarted: handleToolStarted,
     onToolCompleted: handleToolCompleted,
+    onAbortStarted: handleAbortStarted,
     onAbortCompleted: handleAbortCompleted,
     onReasoningDelta: handleReasoningDelta,
     onThinkingDelta: handleThinkingDelta,
@@ -148,6 +150,8 @@ export function initChat(): void {
 
 export function send(input: string, opts?: { model?: string; profile?: string; provider?: string }): void {
   const sessionId = activeSessionId.value ?? uuid()
+  const state = getState(sessionId)
+  if (state.streaming || state.aborting) return
 
   if (!activeSessionId.value) {
     activeSessionId.value = sessionId
@@ -193,7 +197,7 @@ export function abort(): void {
   const sessionId = activeSessionId.value
   if (!sessionId) return
   const state = getState(sessionId)
-  if (!state.streaming) return
+  if (!state.streaming || state.aborting) return
   setState(sessionId, { aborting: true })
   sendAbort(sessionId)
 }
@@ -299,9 +303,32 @@ function handleToolCompleted(payload: ToolCompletedPayload): void {
   setState(payload.session_id, { tools })
 }
 
+function handleAbortStarted(payload: AbortStartedPayload): void {
+  pushDebugEvent('abort.started', payload)
+  setState(payload.session_id, { aborting: true })
+}
+
 function handleAbortCompleted(payload: AbortCompletedPayload): void {
   pushDebugEvent('abort.completed', payload)
+  const state = getState(payload.session_id)
+
+  if (state.output && payload.session_id === activeSessionId.value) {
+    const partialMessage: Message = {
+      id: uuid(),
+      session_id: payload.session_id,
+      role: 'assistant',
+      content: state.output,
+      ...(state.reasoning ? { reasoning: state.reasoning } : {}),
+      timestamp: new Date().toISOString(),
+    }
+    messages.value = [...messages.value, partialMessage]
+  }
+
   clearState(payload.session_id)
+
+  if (!payload.synced && payload.error) {
+    setState(payload.session_id, { error: payload.error })
+  }
 }
 
 function handleReasoningDelta(payload: ReasoningDeltaPayload): void {

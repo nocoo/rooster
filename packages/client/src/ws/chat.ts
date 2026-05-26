@@ -80,6 +80,13 @@ export interface AbortCompletedPayload {
   error?: string
 }
 
+export interface AbortStartedPayload {
+  event: 'abort.started'
+  session_id: string
+  run_id: string
+  graceMs: number
+}
+
 export interface ReasoningDeltaPayload {
   event: 'reasoning.delta'
   session_id: string
@@ -161,6 +168,7 @@ export type ChatEventHandler = {
   onRunFailed?: (payload: RunFailedPayload) => void
   onToolStarted?: (payload: ToolStartedPayload) => void
   onToolCompleted?: (payload: ToolCompletedPayload) => void
+  onAbortStarted?: (payload: AbortStartedPayload) => void
   onAbortCompleted?: (payload: AbortCompletedPayload) => void
   onReasoningDelta?: (payload: ReasoningDeltaPayload) => void
   onThinkingDelta?: (payload: ThinkingDeltaPayload) => void
@@ -194,6 +202,7 @@ export function connect(): void {
   socket.on('run.failed', (d: RunFailedPayload) => { handlers.onRunFailed?.(d) })
   socket.on('tool.started', (d: ToolStartedPayload) => { handlers.onToolStarted?.(d) })
   socket.on('tool.completed', (d: ToolCompletedPayload) => { handlers.onToolCompleted?.(d) })
+  socket.on('abort.started', (d: AbortStartedPayload) => { handlers.onAbortStarted?.(d) })
   socket.on('abort.completed', (d: AbortCompletedPayload) => { handlers.onAbortCompleted?.(d) })
   socket.on('reasoning.delta', (d: ReasoningDeltaPayload) => { handlers.onReasoningDelta?.(d) })
   socket.on('thinking.delta', (d: ThinkingDeltaPayload) => { handlers.onThinkingDelta?.(d) })

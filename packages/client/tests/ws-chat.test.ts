@@ -56,6 +56,7 @@ describe('ws/chat', () => {
       expect(mockSocket._listeners.has('approval.resolved')).toBe(true)
       expect(mockSocket._listeners.has('clarify.requested')).toBe(true)
       expect(mockSocket._listeners.has('clarify.resolved')).toBe(true)
+      expect(mockSocket._listeners.has('abort.started')).toBe(true)
       expect(mockSocket._listeners.has('resumed')).toBe(true)
     })
 
@@ -164,6 +165,14 @@ describe('ws/chat', () => {
       connect()
       mockSocket._trigger('abort.completed', { event: 'abort.completed', run_id: 'r1', synced: true })
       expect(onAbortCompleted).toHaveBeenCalled()
+    })
+
+    it('should call handler on abort.started', () => {
+      const onAbortStarted = vi.fn()
+      setHandlers({ onAbortStarted })
+      connect()
+      mockSocket._trigger('abort.started', { event: 'abort.started', session_id: 's1', run_id: 'r1', graceMs: 5000 })
+      expect(onAbortStarted).toHaveBeenCalledWith({ event: 'abort.started', session_id: 's1', run_id: 'r1', graceMs: 5000 })
     })
   })
 

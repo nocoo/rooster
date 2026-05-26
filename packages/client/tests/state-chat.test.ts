@@ -77,6 +77,7 @@ describe('state/chat', () => {
       expect(typeof handlers['onToolStarted']).toBe('function')
       expect(typeof handlers['onToolCompleted']).toBe('function')
       expect(typeof handlers['onAbortCompleted']).toBe('function')
+      expect(typeof handlers['onAbortStarted']).toBe('function')
       expect(typeof handlers['onReasoningDelta']).toBe('function')
       expect(typeof handlers['onThinkingDelta']).toBe('function')
       expect(typeof handlers['onReasoningAvailable']).toBe('function')
@@ -158,6 +159,20 @@ describe('state/chat', () => {
       expect(activeSessionId.value).toBe('existing-session')
       expect(sessions.value).toHaveLength(0)
     })
+
+    it('should not send when session is already streaming', () => {
+      activeSessionId.value = 's1'
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+      send('hello')
+      expect(mockSendRun).not.toHaveBeenCalled()
+    })
+
+    it('should not send when session is aborting', () => {
+      activeSessionId.value = 's1'
+      runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+      send('hello')
+      expect(mockSendRun).not.toHaveBeenCalled()
+    })
   })
 
   describe('abort', () => {
@@ -180,6 +195,13 @@ describe('state/chat', () => {
       runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       abort()
       expect(aborting.value).toBe(false)
+      expect(mockSendAbort).not.toHaveBeenCalled()
+    })
+
+    it('should not abort when already aborting', () => {
+      activeSessionId.value = 's1'
+      runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+      abort()
       expect(mockSendAbort).not.toHaveBeenCalled()
     })
   })
@@ -237,6 +259,7 @@ describe('state/chat', () => {
       onRunFailed: Handler
       onToolStarted: Handler
       onToolCompleted: Handler
+      onAbortStarted: Handler
       onAbortCompleted: Handler
       onReasoningDelta: Handler
       onThinkingDelta: Handler
@@ -423,14 +446,47 @@ describe('state/chat', () => {
       expect(currentRunId.value).toBeNull()
     })
 
-    it('handleAbortCompleted should ignore different session', () => {
+    it('handleAbortCompleted should preserve partial output as message', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: 'partial work', reasoning: 'some thinking', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+      h['onAbortCompleted']({ event: 'abort.completed', session_id: 's1', run_id: 'r1', synced: true })
+      expect(messages.value).toHaveLength(1)
+      expect(messages.value[0]?.content).toBe('partial work')
+      expect(messages.value[0]?.reasoning).toBe('some thinking')
+    })
+
+    it('handleAbortCompleted should not add message when no partial output', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
       runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
-      h['onAbortCompleted']({ event: 'abort.completed', session_id: 'other', run_id: 'r1', synced: true })
-      expect(streaming.value).toBe(true)
+      h['onAbortCompleted']({ event: 'abort.completed', session_id: 's1', run_id: 'r1', synced: true })
+      expect(messages.value).toHaveLength(0)
+    })
+
+    it('handleAbortCompleted should set error when synced is false', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+      h['onAbortCompleted']({ event: 'abort.completed', session_id: 's1', run_id: 'r1', synced: false, error: 'bridge unreachable' })
+      expect(chatError.value).toBe('bridge unreachable')
+      expect(streaming.value).toBe(false)
+    })
+
+    it('handleAbortStarted should set aborting to true', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+      h['onAbortStarted']({ event: 'abort.started', session_id: 's1', run_id: 'r1', graceMs: 5000 })
       expect(aborting.value).toBe(true)
-      expect(currentRunId.value).toBe('r1')
+    })
+
+    it('handleAbortStarted should ignore different session', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+      h['onAbortStarted']({ event: 'abort.started', session_id: 'other', run_id: 'r2', graceMs: 5000 })
+      expect(aborting.value).toBe(false)
     })
 
     it('handleReasoningDelta should append text', () => {
