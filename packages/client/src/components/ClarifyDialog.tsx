@@ -1,10 +1,16 @@
-import { signal } from '@preact/signals'
+import { useSignal, useComputed } from '@preact/signals'
+import { useEffect } from 'preact/hooks'
 import { pendingClarify, respondClarify } from '../state/chat.js'
-
-const clarifyInput = signal('')
 
 export function ClarifyDialog() {
   const clarify = pendingClarify.value
+  const clarifyInput = useSignal('')
+  const clarifyId = useComputed(() => pendingClarify.value?.clarify_id ?? null)
+
+  useEffect(() => {
+    clarifyInput.value = ''
+  }, [clarifyId.value])
+
   if (!clarify) return null
 
   const handleSubmit = () => {
@@ -53,6 +59,9 @@ export function ClarifyDialog() {
             {clarify.responding ? '…' : 'Send'}
           </button>
         </div>
+        {clarify.timeout_ms != null && (
+          <p class="f6 color-fg-muted mt-2">Timeout: {Math.round(clarify.timeout_ms / 1000)}s</p>
+        )}
       </div>
     </div>
   )

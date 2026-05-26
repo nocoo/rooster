@@ -112,4 +112,32 @@ describe('ClarifyDialog', () => {
     fireEvent.keyDown(input, { key: 'a' })
     expect(mockSendClarifyRespond).not.toHaveBeenCalled()
   })
+
+  it('should render timeout when timeout_ms is provided', () => {
+    activeSessionId.value = 's1'
+    runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: { clarify_id: 'clr-1', question: 'What?', timeout_ms: 60000 }, error: null } }
+    render(<ClarifyDialog />)
+    expect(screen.getByText('Timeout: 60s')).toBeTruthy()
+  })
+
+  it('should not render timeout when timeout_ms is absent', () => {
+    activeSessionId.value = 's1'
+    runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: { clarify_id: 'clr-1', question: 'What?' }, error: null } }
+    render(<ClarifyDialog />)
+    expect(screen.queryByText(/Timeout/)).toBeNull()
+  })
+
+  it('should reset input when clarify_id changes', () => {
+    activeSessionId.value = 's1'
+    runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: { clarify_id: 'clr-1', question: 'First?' }, error: null } }
+    const { rerender } = render(<ClarifyDialog />)
+    const input = screen.getByPlaceholderText('Type a response…')
+    fireEvent.input(input, { target: { value: 'partial typing' } })
+    expect((input as HTMLInputElement).value).toBe('partial typing')
+
+    runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: { clarify_id: 'clr-2', question: 'Second?' }, error: null } }
+    rerender(<ClarifyDialog />)
+    const input2 = screen.getByPlaceholderText('Type a response…')
+    expect((input2 as HTMLInputElement).value).toBe('')
+  })
 })

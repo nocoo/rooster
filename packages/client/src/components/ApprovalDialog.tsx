@@ -31,6 +31,9 @@ export function ApprovalDialog() {
         {approval.allow_permanent && (
           <p class="f6 color-fg-muted mt-2">This can be allowed permanently.</p>
         )}
+        {approval.timeout_ms != null && (
+          <p class="f6 color-fg-muted mt-2">Timeout: {Math.round(approval.timeout_ms / 1000)}s</p>
+        )}
       </div>
     </div>
   )

@@ -81,4 +81,18 @@ describe('ApprovalDialog', () => {
     const buttons = screen.getAllByRole('button')
     buttons.forEach((btn) => { expect((btn as HTMLButtonElement).disabled).toBe(true) })
   })
+
+  it('should render timeout when timeout_ms is provided', () => {
+    activeSessionId.value = 's1'
+    runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: { approval_id: 'apr-1', command: 'cmd', choices: ['allow', 'deny'], timeout_ms: 30000 }, clarify: null, error: null } }
+    render(<ApprovalDialog />)
+    expect(screen.getByText('Timeout: 30s')).toBeTruthy()
+  })
+
+  it('should not render timeout when timeout_ms is absent', () => {
+    activeSessionId.value = 's1'
+    runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: { approval_id: 'apr-1', command: 'cmd', choices: ['allow', 'deny'] }, clarify: null, error: null } }
+    render(<ApprovalDialog />)
+    expect(screen.queryByText(/Timeout/)).toBeNull()
+  })
 })
