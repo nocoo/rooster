@@ -6,7 +6,7 @@ import { createHttpServer } from './server.js'
 const { httpServer } = createHttpServer({ db: getDb(), bridge: getBridgeClient() })
 
 const port = parseInt(process.env['PORT'] ?? '7038', 10)
-const host = process.env['BIND_HOST'] ?? '127.0.0.1'
+const host = process.env['BIND_HOST'] ?? '0.0.0.0'
 
 if (host !== '127.0.0.1' && host !== 'localhost') {
   logger.warn(

@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals'
+import { uuid } from '../lib/uuid.js'
 
 export interface DebugEvent {
   id: string
@@ -16,7 +17,7 @@ export function toggleDebug(): void {
 
 export function pushDebugEvent(event: string, payload: unknown): void {
   const entry: DebugEvent = {
-    id: crypto.randomUUID(),
+    id: uuid(),
     time: new Date().toISOString(),
     event,
     payload,

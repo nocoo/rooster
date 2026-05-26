@@ -22,6 +22,7 @@ import {
 import { sessions, sessionsTotal, activeSessionId, messages, loadSessions } from './sessions.js'
 import { pushDebugEvent } from './debug.js'
 import type { Message } from '../types.js'
+import { uuid } from '../lib/uuid.js'
 
 export interface AgentStatus {
   type: string
@@ -112,7 +113,7 @@ export function initChat(): void {
 }
 
 export function send(input: string, opts?: { model?: string; profile?: string; provider?: string }): void {
-  const sessionId = activeSessionId.value ?? crypto.randomUUID()
+  const sessionId = activeSessionId.value ?? uuid()
 
   if (!activeSessionId.value) {
     activeSessionId.value = sessionId
@@ -125,7 +126,7 @@ export function send(input: string, opts?: { model?: string; profile?: string; p
   }
 
   const userMessage: Message = {
-    id: crypto.randomUUID(),
+    id: uuid(),
     session_id: sessionId,
     role: 'user',
     content: input,
@@ -177,7 +178,7 @@ function handleRunCompleted(payload: RunCompletedPayload): void {
   const finalOutput = payload.output || state.output
 
   const assistantMessage: Message = {
-    id: crypto.randomUUID(),
+    id: uuid(),
     session_id: payload.session_id,
     role: 'assistant',
     content: finalOutput,
@@ -198,7 +199,7 @@ function handleRunFailed(payload: RunFailedPayload): void {
 
   if (state.output && payload.session_id === activeSessionId.value) {
     const partialMessage: Message = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       session_id: payload.session_id,
       role: 'assistant',
       content: state.output,
