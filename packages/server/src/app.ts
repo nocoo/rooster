@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { healthRoute } from './routes/health.js'
+import { createHealthRoute } from './routes/health.js'
 import { createSessionRoutes } from './routes/sessions.js'
 import { createBridgeRoutes } from './routes/bridge.js'
 import { SessionStore } from './services/hermes/session-store.js'
@@ -17,7 +17,7 @@ export function createApp(deps: AppDeps): Hono {
   const messageStore = new MessageStore(deps.db)
 
   const app = new Hono()
-  app.route('/health', healthRoute)
+  app.route('/health', createHealthRoute({ bridge: deps.bridge }))
   app.route('/api/hermes/sessions', createSessionRoutes({ sessionStore, messageStore, bridge: deps.bridge }))
   app.route('/api/hermes', createBridgeRoutes(deps.bridge))
   return app

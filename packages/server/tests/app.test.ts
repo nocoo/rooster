@@ -42,6 +42,8 @@ describe('app routes', () => {
                 { role: 'assistant', content: 'hi there' },
               ],
             }
+          } else if (req['action'] === 'ping') {
+            res = { ok: true }
           }
           conn.write(JSON.stringify(res) + '\n')
           conn.end()
@@ -59,13 +61,24 @@ describe('app routes', () => {
   })
 
   describe('GET /health', () => {
-    it('should return status ok with timestamp', async () => {
+    it('should return status ok with bridge connected', async () => {
       const res = await app.request('/health')
       expect(res.status).toBe(200)
-      const body = (await res.json()) as { status: string; timestamp: string }
+      const body = (await res.json()) as { status: string; timestamp: string; bridge: string }
       expect(body.status).toBe('ok')
+      expect(body.bridge).toBe('connected')
       expect(body.timestamp).toBeDefined()
       expect(new Date(body.timestamp).getTime()).not.toBeNaN()
+    })
+
+    it('should return degraded when bridge is unreachable', async () => {
+      const unreachableBridge = new AgentBridgeClient({ endpoint: '/tmp/nonexistent-bridge.sock', connectRetryMs: 100 })
+      const degradedApp = createApp({ db, bridge: unreachableBridge })
+      const res = await degradedApp.request('/health')
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { status: string; bridge: string }
+      expect(body.status).toBe('degraded')
+      expect(body.bridge).toBe('unreachable')
     })
   })
 
