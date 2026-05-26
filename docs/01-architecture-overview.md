@@ -111,32 +111,53 @@ rooster/
 ├── packages/
 │   ├── server/          # Hono server — reimplemented from protocol spec
 │   │   ├── src/
-│   │   │   ├── index.ts
+│   │   │   ├── index.ts         # Entry point (bind + listen)
+│   │   │   ├── app.ts           # Hono app assembly (route registration)
+│   │   │   ├── server.ts        # HTTP + Socket.IO server creation
 │   │   │   ├── routes/
-│   │   │   │   ├── hermes/     # Protocol-compatible routes
-│   │   │   │   └── index.ts    # Route registration
+│   │   │   │   ├── health.ts    # /health (bridge ping)
+│   │   │   │   ├── sessions.ts  # /api/hermes/sessions (CRUD + conversations)
+│   │   │   │   └── bridge.ts    # /api/hermes/{profiles,models,providers}
 │   │   │   ├── services/
-│   │   │   │   └── hermes/     # chat-run, agent-bridge, gateway
-│   │   │   ├── db/
-│   │   │   │   └── hermes/     # session-store, schemas
-│   │   │   └── lib/            # Shared utils
-│   │   ├── tests/              # 95%+ coverage target
+│   │   │   │   └── hermes/
+│   │   │   │       ├── agent-bridge.ts   # IPC/TCP client
+│   │   │   │       ├── db.ts             # SQLite init + schema
+│   │   │   │       ├── session-store.ts  # Session CRUD
+│   │   │   │       ├── message-store.ts  # Message persistence
+│   │   │   │       └── chat-run/         # Socket.IO chat orchestration
+│   │   │   └── lib/
+│   │   │       └── logger.ts    # pino logger
+│   │   ├── tests/
 │   │   ├── package.json
 │   │   └── tsconfig.json
-│   └── client/          # Vite SPA — complete implementation
+│   └── client/          # Vite SPA
 │       ├── src/
 │       │   ├── main.tsx
 │       │   ├── pages/
+│       │   │   └── App.tsx
 │       │   ├── components/
+│       │   │   ├── ChatInput.tsx
+│       │   │   ├── MessageHistory.tsx
+│       │   │   ├── SessionList.tsx
+│       │   │   ├── StreamingMessage.tsx
+│       │   │   ├── ToolTrace.tsx
+│       │   │   └── HeaderSettings.tsx
 │       │   ├── api/
+│       │   │   ├── client.ts
+│       │   │   ├── sessions.ts
+│       │   │   └── settings.ts
 │       │   ├── ws/
+│       │   │   └── chat.ts
 │       │   └── state/
+│       │       ├── sessions.ts
+│       │       ├── chat.ts
+│       │       └── settings.ts
 │       ├── index.html
-│       ├── tests/              # 95%+ (views excluded)
+│       ├── tests/
 │       ├── package.json
 │       └── tsconfig.json
 ├── docs/                # Design documents
-├── LICENSE              # MIT
+├── scripts/             # Build helpers (ensure-native.ts)
 ├── package.json         # Workspace root (bun workspaces)
 ├── bunfig.toml          # Bun configuration
 ├── vitest.config.ts     # Test config (coverage thresholds)

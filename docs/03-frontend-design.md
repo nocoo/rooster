@@ -50,9 +50,8 @@ Total initial bundle (Phase 1): ~90KB gzipped estimated.
 ## 3. Page Structure (Phase 1 MVP only)
 
 ```
-/                         → Chat (default session or new)
-/session/:id              → Chat with specific session
-/history                  → Session history list
+/                         → Home (new conversation prompt + ChatInput)
+/session/:id              → Chat with specific session (MessageHistory)
 ```
 
 Phase 2+ pages added incrementally (see doc 05).
@@ -87,14 +86,12 @@ Phase 2+ pages added incrementally (see doc 05).
 
 | Component | File | Responsibility |
 |-----------|------|---------------|
-| `App` | `pages/App.tsx` | Layout shell, router |
-| `ChatPage` | `pages/ChatPage.tsx` | Session lifecycle, connect Socket.IO |
-| `MessageList` | `components/MessageList.tsx` | Scrollable container, auto-scroll |
-| `MessageBubble` | `components/MessageBubble.tsx` | Single message: markdown + code |
+| `App` | `pages/App.tsx` | Layout shell, router, init lifecycle |
+| `MessageHistory` | `components/MessageHistory.tsx` | Message list + streaming + tools + input |
 | `StreamingMessage` | `components/StreamingMessage.tsx` | Live-updating message during stream |
-| `ChatInput` | `components/ChatInput.tsx` | Textarea + send/abort buttons |
-| `SessionList` | `components/SessionList.tsx` | Left panel session navigator |
-| `Header` | `components/Header.tsx` | Profile/model selectors |
+| `ChatInput` | `components/ChatInput.tsx` | Textarea + send/stop buttons |
+| `SessionList` | `components/SessionList.tsx` | Left panel session navigator + New button |
+| `HeaderSettings` | `components/HeaderSettings.tsx` | Profile/model selectors |
 | `ToolTrace` | `components/ToolTrace.tsx` | Collapsible tool call display |
 
 ## 6. State Management

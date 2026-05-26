@@ -22,31 +22,21 @@ Replaces hermes-web-ui's Koa stack.
 | Module | Responsibility |
 |--------|---------------|
 | `services/hermes/agent-bridge.ts` | IPC/TCP client to Hermes Agent bridge |
-| `services/hermes/chat-run/` | Chat orchestration: bridge polling loop, event emission |
 | `services/hermes/chat-run/socket.ts` | Socket.IO namespace `/chat-run` handler |
 | `services/hermes/chat-run/bridge-run.ts` | Bridge path: poll → parse events → emit |
-| `services/hermes/chat-run/gateway-run.ts` | Gateway path: SSE → parse → emit |
 | `services/hermes/chat-run/abort.ts` | Run abort logic |
-| `services/hermes/gateway.ts` | Gateway process management + SSE parsing |
-| `services/hermes/session-store.ts` | Session CRUD + message persistence |
+| `services/hermes/chat-run/types.ts` | Shared type definitions for chat-run |
+| `services/hermes/session-store.ts` | Session CRUD |
+| `services/hermes/message-store.ts` | Message persistence + pagination |
+| `services/hermes/db.ts` | SQLite database initialization + schema |
 
 ### Route Modules (Hono routers)
 
 | Module | Responsibility |
 |--------|---------------|
-| `routes/health.ts` | Health check, bridge status |
-| `routes/hermes/sessions.ts` | Session CRUD, conversations, messages |
-| `routes/hermes/profiles.ts` | Profile list, active profile |
-| `routes/hermes/models.ts` | Available models |
-| `routes/hermes/providers.ts` | Provider config |
-| `routes/hermes/skills.ts` | Skills management (Phase 3) |
-| `routes/hermes/plugins.ts` | Plugin management (Phase 3) |
-| `routes/hermes/memory.ts` | Memory browser (Phase 3) |
-| `routes/hermes/config.ts` | Runtime config (Phase 3) |
-| `routes/hermes/files.ts` | File browser (Phase 3) |
-| `routes/hermes/logs.ts` | Log viewer (Phase 3) |
-| `routes/hermes/jobs.ts` | Jobs + cron history (Phase 3) |
-| `routes/hermes/terminal.ts` | Terminal WebSocket (Phase 3) |
+| `routes/health.ts` | Health check + bridge connectivity probe |
+| `routes/sessions.ts` | Session CRUD, conversations, messages, hermes proxy |
+| `routes/bridge.ts` | Profiles/models/providers derived from bridge list |
 
 ## 3. API Route Map
 
@@ -200,12 +190,13 @@ Copyright (c) 2026 ...
   "private": true,
   "workspaces": ["packages/*"],
   "scripts": {
-    "dev": "bun run --filter ./packages/server dev",
+    "dev": "bun run --filter '*' dev",
     "build": "bun run --filter '*' build",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "rebuild:native": "tsx scripts/ensure-native.ts",
+    "test": "bun run rebuild:native && vitest run",
+    "test:coverage": "bun run rebuild:native && vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p packages/server --noEmit && tsc -p packages/client --noEmit && tsc --noEmit",
     "prepare": "husky"
   }
 }
@@ -219,8 +210,5 @@ Each package declares its own dependencies (latest stable at time of init).
 |---|---|---|
 | `PORT` | `8648` | Server listen port |
 | `BIND_HOST` | `127.0.0.1` | Bind address (**localhost by default**) |
-| `ROOSTER_HOME` | `~/.rooster` | Data directory (DB, logs) |
-| `HERMES_AGENT_BRIDGE_ENDPOINT` | `ipc:///tmp/hermes-agent-bridge.sock` | Agent bridge IPC path |
-| `GATEWAY_HOST` | (none) | Hermes gateway upstream (optional) |
+| `HERMES_AGENT_BRIDGE_ENDPOINT` | `/tmp/hermes-agent-bridge.sock` | Agent bridge IPC socket path (also accepts `tcp://host:port` or `ipc://path`) |
 | `LOG_LEVEL` | `info` | pino log level |
-| `WORKSPACE_BASE` | `.` | File browser root |
