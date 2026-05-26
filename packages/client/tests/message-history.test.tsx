@@ -136,6 +136,37 @@ describe('MessageHistory', () => {
     render(<MessageHistory />)
     expect(screen.getByText('Connection lost')).toBeTruthy()
   })
+
+  it('should render attachment chips on user messages with attachments', () => {
+    sessions.value = [{ id: 's1', title: 'Chat', started_at: '2025-01-01', last_active: '2025-01-01' }]
+    activeSessionId.value = 's1'
+    messages.value = [
+      {
+        id: 'm1', session_id: 's1', role: 'user', content: 'See attached',
+        timestamp: '2025-01-01T12:00:00Z',
+        attachments: [
+          { id: 'att-1', original_name: 'report.pdf', mime_type: 'application/pdf', size: 2048 },
+          { id: 'att-2', original_name: 'image.png', mime_type: 'image/png', size: 1024 },
+        ],
+      },
+    ]
+
+    const { container } = render(<MessageHistory />)
+    expect(screen.getByText('report.pdf')).toBeTruthy()
+    expect(screen.getByText('image.png')).toBeTruthy()
+    expect(container.querySelectorAll('.message-attachment-chip')).toHaveLength(2)
+  })
+
+  it('should not render attachment section when message has no attachments', () => {
+    sessions.value = [{ id: 's1', title: 'Chat', started_at: '2025-01-01', last_active: '2025-01-01' }]
+    activeSessionId.value = 's1'
+    messages.value = [
+      { id: 'm1', session_id: 's1', role: 'user', content: 'plain text', timestamp: '2025-01-01T12:00:00Z' },
+    ]
+
+    const { container } = render(<MessageHistory />)
+    expect(container.querySelector('.message-attachments')).toBeNull()
+  })
 })
 
 describe('MessageHistory — jump to bottom', () => {

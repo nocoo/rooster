@@ -41,7 +41,7 @@ vi.mock('../src/api/upload.js', () => ({
 import { ChatInput } from '../src/components/ChatInput.js'
 import { runStates } from '../src/state/chat.js'
 import { activeSessionId } from '../src/state/sessions.js'
-import { pendingAttachments, clearAttachments, addFiles } from '../src/state/attachments.js'
+import { pendingAttachments, addFiles } from '../src/state/attachments.js'
 import { uploadFile } from '../src/api/upload.js'
 import * as chatModule from '../src/state/chat.js'
 
@@ -53,7 +53,7 @@ describe('ChatInput — attachments', () => {
   beforeEach(() => {
     activeSessionId.value = 'test-session'
     runStates.value = {}
-    clearAttachments()
+    pendingAttachments.value = []
     mockSend = vi.spyOn(chatModule, 'send').mockImplementation(() => {})
   })
 
@@ -114,6 +114,19 @@ describe('ChatInput — attachments', () => {
     textarea.value = 'go'
     fireEvent.submit(textarea.closest('form') as HTMLFormElement)
     expect(pendingAttachments.value).toHaveLength(0)
+  })
+
+  it('should keep failed attachments after send and only clear ready ones', () => {
+    pendingAttachments.value = [
+      { localId: 'l1', original_name: 'ok.txt', mime_type: 'text/plain', size: 5, status: 'ready', serverId: 's1' },
+      { localId: 'l2', original_name: 'bad.txt', mime_type: 'text/plain', size: 5, status: 'error', error: 'Failed' },
+    ]
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'go'
+    fireEvent.submit(textarea.closest('form') as HTMLFormElement)
+    expect(pendingAttachments.value).toHaveLength(1)
+    expect(pendingAttachments.value[0]?.status).toBe('error')
   })
 
   it('should disable Send while upload is in progress', () => {

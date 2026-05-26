@@ -1,3 +1,10 @@
+export interface AttachmentRef {
+  id: string
+  original_name: string
+  mime_type: string
+  size: number
+}
+
 export interface Session {
   id: string
   title?: string
@@ -16,6 +23,7 @@ export interface Message {
   content: string
   reasoning?: string | null
   timestamp: string
+  attachments?: AttachmentRef[]
 }
 
 export interface SessionListResponse {

@@ -167,6 +167,19 @@ describe('state/chat', () => {
       expect(mockSendRun).not.toHaveBeenCalled()
     })
 
+    it('should include attachments in payload and user message', () => {
+      const attachments = [
+        { id: 'att-1', original_name: 'doc.pdf', mime_type: 'application/pdf', size: 2048 },
+      ]
+      send('check this', { attachments })
+      expect(mockSendRun).toHaveBeenCalledWith(expect.objectContaining({
+        input: 'check this',
+        attachments,
+      }))
+      const lastMsg = messages.value[messages.value.length - 1]
+      expect(lastMsg?.attachments).toEqual(attachments)
+    })
+
     it('should not send when session is aborting', () => {
       activeSessionId.value = 's1'
       runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }

@@ -59,5 +59,5 @@ export function removeAttachment(localId: string): void {
 }
 
 export function clearAttachments(): void {
-  pendingAttachments.value = []
+  pendingAttachments.value = pendingAttachments.value.filter((a) => a.status === 'error')
 }

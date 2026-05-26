@@ -617,6 +617,31 @@ html, body, #app {
   color: var(--fgColor-danger, var(--color-danger-fg));
 }
 
+/* Message attachment display */
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.message-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
+  color: var(--fgColor-muted, var(--color-fg-muted));
+}
+
+.message-attachment-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Responsive: narrow screens */
 @media (max-width: 768px) {
   .app-sidebar {

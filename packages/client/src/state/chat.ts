@@ -171,6 +171,7 @@ export function send(input: string, opts?: { model?: string; profile?: string; p
     role: 'user',
     content: input,
     timestamp: new Date().toISOString(),
+    ...(opts?.attachments && opts.attachments.length > 0 ? { attachments: opts.attachments } : {}),
   }
   messages.value = [...messages.value, userMessage]
 

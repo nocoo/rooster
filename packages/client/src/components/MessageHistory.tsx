@@ -11,6 +11,19 @@ import { ClarifyDialog } from './ClarifyDialog.js'
 import { Markdown } from './Markdown.js'
 import { ReasoningBlock } from './ReasoningBlock.js'
 import { isNearBottom, scrollToBottom } from '../lib/auto-scroll.js'
+import type { AttachmentRef } from '../types.js'
+
+function AttachmentList({ attachments }: { attachments: AttachmentRef[] }) {
+  return (
+    <div class="message-attachments">
+      {attachments.map((a) => (
+        <span key={a.id} class="message-attachment-chip">
+          <span class="message-attachment-name">{a.original_name}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
 
 export function MessageHistory() {
   const msgs = messages.value
@@ -98,7 +111,12 @@ export function MessageHistory() {
                   <Markdown content={msg.content} />
                 </>
               ) : (
-                <div class="message-content">{msg.content}</div>
+                <>
+                  <div class="message-content">{msg.content}</div>
+                  {msg.attachments && msg.attachments.length > 0 && (
+                    <AttachmentList attachments={msg.attachments} />
+                  )}
+                </>
               )}
             </div>
           ))}
