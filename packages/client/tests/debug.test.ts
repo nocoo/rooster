@@ -18,21 +18,18 @@ describe('debug state', () => {
     expect(debugEnabled.value).toBe(false)
   })
 
-  it('should not push events when disabled', () => {
-    pushDebugEvent('test.event', { foo: 'bar' })
-    expect(debugEvents.value).toHaveLength(0)
-  })
-
-  it('should push events when enabled', () => {
-    debugEnabled.value = true
+  it('should always collect events regardless of toggle state', () => {
     pushDebugEvent('test.event', { foo: 'bar' })
     expect(debugEvents.value).toHaveLength(1)
     expect(debugEvents.value[0]?.event).toBe('test.event')
+  })
+
+  it('should push events with correct payload', () => {
+    pushDebugEvent('test.event', { foo: 'bar' })
     expect(debugEvents.value[0]?.payload).toEqual({ foo: 'bar' })
   })
 
   it('should clear events', () => {
-    debugEnabled.value = true
     pushDebugEvent('a', {})
     pushDebugEvent('b', {})
     expect(debugEvents.value).toHaveLength(2)

@@ -15,7 +15,6 @@ export function toggleDebug(): void {
 }
 
 export function pushDebugEvent(event: string, payload: unknown): void {
-  if (!debugEnabled.value) return
   const entry: DebugEvent = {
     id: crypto.randomUUID(),
     time: new Date().toISOString(),
