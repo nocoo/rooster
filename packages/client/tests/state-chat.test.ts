@@ -5,6 +5,7 @@ import {
   currentRunId,
   streamOutput,
   reasoningText,
+  reasoningDone,
   toolEvents,
   chatError,
   isWorking,
@@ -45,6 +46,7 @@ describe('state/chat', () => {
     currentRunId.value = null
     streamOutput.value = ''
     reasoningText.value = ''
+    reasoningDone.value = false
     toolEvents.value = []
     chatError.value = null
     activeSessionId.value = null
@@ -71,6 +73,10 @@ describe('state/chat', () => {
       expect(typeof handlers['onToolCompleted']).toBe('function')
       expect(typeof handlers['onAbortCompleted']).toBe('function')
       expect(typeof handlers['onReasoningDelta']).toBe('function')
+      expect(typeof handlers['onThinkingDelta']).toBe('function')
+      expect(typeof handlers['onReasoningAvailable']).toBe('function')
+      expect(typeof handlers['onAgentEvent']).toBe('function')
+      expect(typeof handlers['onResumed']).toBe('function')
       expect(mockConnect).toHaveBeenCalled()
     })
   })
@@ -178,6 +184,10 @@ describe('state/chat', () => {
       onToolCompleted: Handler
       onAbortCompleted: Handler
       onReasoningDelta: Handler
+      onThinkingDelta: Handler
+      onReasoningAvailable: Handler
+      onAgentEvent: Handler
+      onResumed: Handler
     }
 
     function getHandlers(): Handlers {
@@ -187,18 +197,35 @@ describe('state/chat', () => {
     }
 
     it('handleRunStarted should set currentRunId', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       h['onRunStarted']({ event: 'run.started', session_id: 's1', run_id: 'r1', queue_length: 0 })
       expect(currentRunId.value).toBe('r1')
     })
 
+    it('handleRunStarted should ignore different session', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onRunStarted']({ event: 'run.started', session_id: 'other', run_id: 'r1', queue_length: 0 })
+      expect(currentRunId.value).toBeNull()
+    })
+
     it('handleMessageDelta should update streamOutput', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       h['onMessageDelta']({ event: 'message.delta', session_id: 's1', run_id: 'r1', delta: 'hi', output: 'hello' })
       expect(streamOutput.value).toBe('hello')
     })
 
+    it('handleMessageDelta should ignore different session', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onMessageDelta']({ event: 'message.delta', session_id: 'other', run_id: 'r1', delta: 'hi', output: 'hello' })
+      expect(streamOutput.value).toBe('')
+    })
+
     it('handleRunCompleted should add assistant message and reset state', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       streaming.value = true
       currentRunId.value = 'r1'
@@ -212,15 +239,38 @@ describe('state/chat', () => {
       expect(streamOutput.value).toBe('')
     })
 
-    it('handleRunFailed should set error and reset streaming', () => {
+    it('handleRunCompleted should use streamOutput when payload.output is empty', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       streaming.value = true
+      streamOutput.value = 'accumulated content'
+      h['onRunCompleted']({ event: 'run.completed', session_id: 's1', run_id: 'r1', output: '' })
+      expect(messages.value[0]?.content).toBe('accumulated content')
+    })
+
+    it('handleRunFailed should set error and preserve partial output', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      streaming.value = true
+      streamOutput.value = 'partial answer'
       h['onRunFailed']({ event: 'run.failed', session_id: 's1', error: 'something broke' })
       expect(chatError.value).toBe('something broke')
       expect(streaming.value).toBe(false)
+      expect(messages.value).toHaveLength(1)
+      expect(messages.value[0]?.content).toBe('partial answer')
+    })
+
+    it('handleRunFailed should not add message if no partial output', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      streaming.value = true
+      h['onRunFailed']({ event: 'run.failed', session_id: 's1', error: 'fail' })
+      expect(chatError.value).toBe('fail')
+      expect(messages.value).toHaveLength(0)
     })
 
     it('handleToolStarted should add tool event', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       h['onToolStarted']({
         event: 'tool.started', session_id: 's1', run_id: 'r1',
@@ -233,6 +283,7 @@ describe('state/chat', () => {
     })
 
     it('handleToolStarted should include preview when present', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       h['onToolStarted']({
         event: 'tool.started', session_id: 's1', run_id: 'r1',
@@ -242,6 +293,7 @@ describe('state/chat', () => {
     })
 
     it('handleToolStarted should omit optional fields when absent', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       h['onToolStarted']({
         event: 'tool.started', session_id: 's1', run_id: 'r1',
@@ -252,6 +304,7 @@ describe('state/chat', () => {
     })
 
     it('handleToolCompleted should update matching tool event', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       toolEvents.value = [{ tool_call_id: 'tc1', name: 'read_file', status: 'started' }]
       h['onToolCompleted']({
@@ -264,6 +317,7 @@ describe('state/chat', () => {
     })
 
     it('handleToolCompleted should include error when present', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       toolEvents.value = [{ tool_call_id: 'tc1', name: 'read_file', status: 'started' }]
       h['onToolCompleted']({
@@ -275,6 +329,7 @@ describe('state/chat', () => {
     })
 
     it('handleToolCompleted should not modify non-matching events', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       toolEvents.value = [
         { tool_call_id: 'tc1', name: 'read_file', status: 'started' },
@@ -299,10 +354,152 @@ describe('state/chat', () => {
     })
 
     it('handleReasoningDelta should append text', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       h['onReasoningDelta']({ event: 'reasoning.delta', session_id: 's1', run_id: 'r1', text: 'think' })
       h['onReasoningDelta']({ event: 'reasoning.delta', session_id: 's1', run_id: 'r1', text: 'ing' })
       expect(reasoningText.value).toBe('thinking')
+    })
+
+    it('handleReasoningDelta should ignore different session', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onReasoningDelta']({ event: 'reasoning.delta', session_id: 'other', run_id: 'r1', text: 'nope' })
+      expect(reasoningText.value).toBe('')
+    })
+
+    it('handleThinkingDelta should append to same reasoningText', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onThinkingDelta']({ event: 'thinking.delta', session_id: 's1', run_id: 'r1', text: 'hmm ' })
+      h['onReasoningDelta']({ event: 'reasoning.delta', session_id: 's1', run_id: 'r1', text: 'ok' })
+      expect(reasoningText.value).toBe('hmm ok')
+    })
+
+    it('handleThinkingDelta should ignore different session', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onThinkingDelta']({ event: 'thinking.delta', session_id: 'other', run_id: 'r1', text: 'nope' })
+      expect(reasoningText.value).toBe('')
+    })
+
+    it('handleReasoningAvailable should set reasoningDone', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onReasoningAvailable']({ event: 'reasoning.available', session_id: 's1', run_id: 'r1' })
+      expect(reasoningDone.value).toBe(true)
+    })
+
+    it('handleReasoningAvailable should ignore different session', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onReasoningAvailable']({ event: 'reasoning.available', session_id: 'other', run_id: 'r1' })
+      expect(reasoningDone.value).toBe(false)
+    })
+
+    it('handleResumed should restore messages and working state', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onResumed']({
+        event: 'resumed',
+        session_id: 's1',
+        messages: [
+          { id: 'm1', session_id: 's1', role: 'user', content: 'hi', timestamp: '2025-01-01' },
+          { id: 'm2', session_id: 's1', role: 'assistant', content: 'hello', timestamp: '2025-01-01' },
+        ],
+        isWorking: true,
+        isAborting: false,
+        events: [],
+      })
+      expect(messages.value).toHaveLength(2)
+      expect(streaming.value).toBe(true)
+      expect(aborting.value).toBe(false)
+    })
+
+    it('handleResumed should ignore different session', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onResumed']({
+        event: 'resumed',
+        session_id: 'other',
+        messages: [{ id: 'm1', session_id: 'other', role: 'user', content: 'hi', timestamp: '2025-01-01' }],
+        isWorking: true,
+        isAborting: false,
+        events: [],
+      })
+      expect(messages.value).toHaveLength(0)
+      expect(streaming.value).toBe(false)
+    })
+
+    it('handleResumed should not overwrite messages if payload has empty array', () => {
+      activeSessionId.value = 's1'
+      messages.value = [{ id: 'm1', session_id: 's1', role: 'user', content: 'existing', timestamp: '2025-01-01' }]
+      const h = getHandlers()
+      h['onResumed']({
+        event: 'resumed',
+        session_id: 's1',
+        messages: [],
+        isWorking: false,
+        isAborting: false,
+        events: [],
+      })
+      expect(messages.value).toHaveLength(1)
+      expect(messages.value[0]?.content).toBe('existing')
+    })
+
+    describe('full event sequence simulation', () => {
+      it('should handle thinking → tool → message → completed', () => {
+        activeSessionId.value = 's1'
+        const h = getHandlers()
+
+        h['onRunStarted']({ event: 'run.started', session_id: 's1', run_id: 'r1', queue_length: 0 })
+        expect(currentRunId.value).toBe('r1')
+
+        h['onThinkingDelta']({ event: 'thinking.delta', session_id: 's1', run_id: 'r1', text: 'Let me think...' })
+        expect(reasoningText.value).toBe('Let me think...')
+
+        h['onToolStarted']({
+          event: 'tool.started', session_id: 's1', run_id: 'r1',
+          tool_call_id: 'tc1', tool: 'Bash', name: 'Bash', arguments: '{"command":"ls"}',
+        })
+        expect(toolEvents.value).toHaveLength(1)
+
+        h['onToolCompleted']({
+          event: 'tool.completed', session_id: 's1', run_id: 'r1',
+          tool_call_id: 'tc1', tool: 'Bash', name: 'Bash', output: 'src\npackage.json', duration: 50,
+        })
+        expect(toolEvents.value[0]?.status).toBe('completed')
+
+        h['onMessageDelta']({ event: 'message.delta', session_id: 's1', run_id: 'r1', delta: 'Here', output: 'Here' })
+        h['onMessageDelta']({ event: 'message.delta', session_id: 's1', run_id: 'r1', delta: ' are files.', output: 'Here are files.' })
+        expect(streamOutput.value).toBe('Here are files.')
+
+        h['onRunCompleted']({ event: 'run.completed', session_id: 's1', run_id: 'r1', output: 'Here are files.' })
+        expect(messages.value).toHaveLength(1)
+        expect(messages.value[0]?.content).toBe('Here are files.')
+        expect(streaming.value).toBe(false)
+        expect(toolEvents.value).toHaveLength(0)
+        expect(reasoningText.value).toBe('')
+      })
+
+      it('should not pollute current session with other session events', () => {
+        activeSessionId.value = 's1'
+        const h = getHandlers()
+        streaming.value = true
+
+        h['onMessageDelta']({ event: 'message.delta', session_id: 'other', run_id: 'r2', delta: 'x', output: 'x' })
+        expect(streamOutput.value).toBe('')
+
+        h['onToolStarted']({
+          event: 'tool.started', session_id: 'other', run_id: 'r2',
+          tool_call_id: 'tc-x', tool: 'Bash', name: 'Bash', arguments: '{}',
+        })
+        expect(toolEvents.value).toHaveLength(0)
+
+        h['onRunCompleted']({ event: 'run.completed', session_id: 'other', run_id: 'r2', output: 'other output' })
+        expect(streaming.value).toBe(true)
+        expect(messages.value).toHaveLength(0)
+      })
     })
   })
 })

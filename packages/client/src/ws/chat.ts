@@ -46,6 +46,7 @@ export interface RunFailedPayload {
   session_id: string
   run_id?: string
   error: string
+  output?: string
 }
 
 export interface ToolStartedPayload {
@@ -86,6 +87,36 @@ export interface ReasoningDeltaPayload {
   text: string
 }
 
+export interface ThinkingDeltaPayload {
+  event: 'thinking.delta'
+  session_id: string
+  run_id: string
+  text: string
+}
+
+export interface ReasoningAvailablePayload {
+  event: 'reasoning.available'
+  session_id: string
+  run_id: string
+}
+
+export interface AgentEventPayload {
+  event: 'agent.event'
+  session_id: string
+  run_id: string
+  type: string
+  [key: string]: unknown
+}
+
+export interface ResumedPayload {
+  event: 'resumed'
+  session_id: string
+  messages: unknown[]
+  isWorking: boolean
+  isAborting: boolean
+  events: unknown[]
+}
+
 export type ChatEventHandler = {
   onRunStarted?: (payload: RunStartedPayload) => void
   onMessageDelta?: (payload: MessageDeltaPayload) => void
@@ -95,6 +126,10 @@ export type ChatEventHandler = {
   onToolCompleted?: (payload: ToolCompletedPayload) => void
   onAbortCompleted?: (payload: AbortCompletedPayload) => void
   onReasoningDelta?: (payload: ReasoningDeltaPayload) => void
+  onThinkingDelta?: (payload: ThinkingDeltaPayload) => void
+  onReasoningAvailable?: (payload: ReasoningAvailablePayload) => void
+  onAgentEvent?: (payload: AgentEventPayload) => void
+  onResumed?: (payload: ResumedPayload) => void
 }
 
 let socket: Socket | null = null
@@ -120,6 +155,10 @@ export function connect(): void {
   socket.on('tool.completed', (d: ToolCompletedPayload) => { handlers.onToolCompleted?.(d) })
   socket.on('abort.completed', (d: AbortCompletedPayload) => { handlers.onAbortCompleted?.(d) })
   socket.on('reasoning.delta', (d: ReasoningDeltaPayload) => { handlers.onReasoningDelta?.(d) })
+  socket.on('thinking.delta', (d: ThinkingDeltaPayload) => { handlers.onThinkingDelta?.(d) })
+  socket.on('reasoning.available', (d: ReasoningAvailablePayload) => { handlers.onReasoningAvailable?.(d) })
+  socket.on('agent.event', (d: AgentEventPayload) => { handlers.onAgentEvent?.(d) })
+  socket.on('resumed', (d: ResumedPayload) => { handlers.onResumed?.(d) })
 }
 
 export function disconnect(): void {

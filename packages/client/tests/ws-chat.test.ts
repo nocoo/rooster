@@ -49,6 +49,10 @@ describe('ws/chat', () => {
       expect(mockSocket._listeners.has('run.started')).toBe(true)
       expect(mockSocket._listeners.has('message.delta')).toBe(true)
       expect(mockSocket._listeners.has('run.completed')).toBe(true)
+      expect(mockSocket._listeners.has('thinking.delta')).toBe(true)
+      expect(mockSocket._listeners.has('reasoning.available')).toBe(true)
+      expect(mockSocket._listeners.has('agent.event')).toBe(true)
+      expect(mockSocket._listeners.has('resumed')).toBe(true)
     })
 
     it('should set connected signal on connect/disconnect events', () => {
@@ -116,6 +120,38 @@ describe('ws/chat', () => {
       connect()
       mockSocket._trigger('reasoning.delta', { event: 'reasoning.delta', run_id: 'r1', text: 'thinking' })
       expect(onReasoningDelta).toHaveBeenCalled()
+    })
+
+    it('should call handler on thinking.delta', () => {
+      const onThinkingDelta = vi.fn()
+      setHandlers({ onThinkingDelta })
+      connect()
+      mockSocket._trigger('thinking.delta', { event: 'thinking.delta', run_id: 'r1', text: 'hmm' })
+      expect(onThinkingDelta).toHaveBeenCalledWith({ event: 'thinking.delta', run_id: 'r1', text: 'hmm' })
+    })
+
+    it('should call handler on reasoning.available', () => {
+      const onReasoningAvailable = vi.fn()
+      setHandlers({ onReasoningAvailable })
+      connect()
+      mockSocket._trigger('reasoning.available', { event: 'reasoning.available', run_id: 'r1' })
+      expect(onReasoningAvailable).toHaveBeenCalled()
+    })
+
+    it('should call handler on agent.event', () => {
+      const onAgentEvent = vi.fn()
+      setHandlers({ onAgentEvent })
+      connect()
+      mockSocket._trigger('agent.event', { event: 'agent.event', run_id: 'r1', type: 'status' })
+      expect(onAgentEvent).toHaveBeenCalled()
+    })
+
+    it('should call handler on resumed', () => {
+      const onResumed = vi.fn()
+      setHandlers({ onResumed })
+      connect()
+      mockSocket._trigger('resumed', { event: 'resumed', session_id: 's1', messages: [], isWorking: false, isAborting: false, events: [] })
+      expect(onResumed).toHaveBeenCalled()
     })
 
     it('should call handler on abort.completed', () => {
