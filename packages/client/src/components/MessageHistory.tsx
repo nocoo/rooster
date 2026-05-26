@@ -42,7 +42,7 @@ export function MessageHistory() {
             class={`message-bubble ${msg.role === 'user' ? 'message-bubble--user' : 'message-bubble--assistant'}`}
           >
             <div class="message-meta">
-              <span class={`Label Label--small ${msg.role === 'assistant' ? 'Label--accent' : 'Label--secondary'}`}>
+              <span class={`Label Label--small ${msg.role === 'assistant' ? 'Label--secondary' : 'Label--outline'}`}>
                 {msg.role}
               </span>
               <span class="color-fg-muted">{new Date(msg.timestamp).toLocaleTimeString()}</span>

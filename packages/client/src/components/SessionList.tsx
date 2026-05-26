@@ -14,7 +14,7 @@ export function SessionList() {
     <div class="p-3">
       <div class="d-flex flex-items-center flex-justify-between mb-3">
         <span class="text-bold f5">Sessions</span>
-        <button class="btn btn-sm btn-primary" type="button" onClick={startNewChat}>
+        <button class="btn btn-sm" type="button" onClick={startNewChat}>
           New Chat
         </button>
       </div>

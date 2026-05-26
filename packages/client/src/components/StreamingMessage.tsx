@@ -9,7 +9,7 @@ export function StreamingMessage() {
   return (
     <div class="streaming-box">
       <div class="streaming-header">
-        <span class="Label Label--accent Label--small">assistant</span>
+        <span class="Label Label--secondary Label--small">assistant</span>
         <span class="AnimatedEllipsis color-fg-muted f6">streaming</span>
       </div>
       {reasoning && (

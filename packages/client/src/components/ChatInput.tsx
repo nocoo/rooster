@@ -52,7 +52,7 @@ export function ChatInput() {
             {isAborting ? 'Stopping…' : 'Stop'}
           </button>
         ) : (
-          <button type="submit" class="btn btn-primary btn-sm" style={{ whiteSpace: 'nowrap' }}>
+          <button type="submit" class="btn btn-sm" style={{ whiteSpace: 'nowrap' }}>
             Send
           </button>
         )}

@@ -10,17 +10,27 @@ import { initChat } from '../state/chat.js'
 import { loadSettings } from '../state/settings.js'
 
 function getInitialColorMode(): 'light' | 'dark' {
-  const stored = localStorage.getItem('color-mode')
-  return stored === 'dark' ? 'dark' : 'light'
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const stored = globalThis.localStorage?.getItem('color-mode')
+    return stored === 'dark' ? 'dark' : 'light'
+  } catch {
+    return 'light'
+  }
 }
 
 export const colorMode = signal<'light' | 'dark'>(getInitialColorMode())
 
-function toggleColorMode() {
+export function toggleColorMode(): void {
   const next = colorMode.value === 'light' ? 'dark' : 'light'
   colorMode.value = next
-  document.documentElement.dataset.colorMode = next
-  localStorage.setItem('color-mode', next)
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.colorMode = next
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    globalThis.localStorage?.setItem('color-mode', next)
+  } catch { /* SSR/test */ }
 }
 
 function ChatPage({ id }: { path: string; id?: string }) {

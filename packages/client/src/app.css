@@ -125,11 +125,12 @@ html, body, #app {
 }
 
 .session-item--active {
-  background: var(--bgColor-accent-muted, var(--color-accent-subtle));
+  background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
+  font-weight: 600;
 }
 
 .session-item--active:hover {
-  background: var(--bgColor-accent-muted, var(--color-accent-subtle));
+  background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
 }
 
 .session-item-label {
