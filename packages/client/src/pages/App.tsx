@@ -6,9 +6,11 @@ import { MessageHistory } from '../components/MessageHistory.js'
 import { ChatInput } from '../components/ChatInput.js'
 import { HeaderSettings } from '../components/HeaderSettings.js'
 import { DebugPanel } from '../components/DebugPanel.js'
+import { BridgeStatus } from '../components/BridgeStatus.js'
 import { loadSessions, setActiveSession, activeSessionId } from '../state/sessions.js'
 import { initChat } from '../state/chat.js'
 import { loadSettings } from '../state/settings.js'
+import { startHealthPolling } from '../state/health.js'
 import { debugEnabled, toggleDebug } from '../state/debug.js'
 
 function getInitialColorMode(): 'light' | 'dark' {
@@ -65,6 +67,7 @@ export function App({ url }: { url?: string }) {
     initChat()
     void loadSessions()
     void loadSettings()
+    startHealthPolling()
   }, [])
 
   return (
@@ -74,6 +77,7 @@ export function App({ url }: { url?: string }) {
           <HeaderSettings />
         </div>
         <div class="app-header-right">
+          <BridgeStatus />
           <button
             type="button"
             class={`btn-octicon${debugEnabled.value ? ' btn-octicon--active' : ''}`}

@@ -34,6 +34,13 @@ html, body, #app {
   gap: 8px;
 }
 
+.bridge-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
 .app-main {
   display: flex;
   flex: 1;
