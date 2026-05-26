@@ -10,7 +10,7 @@ function StatusItem({ status }: { status: AgentStatus }) {
   if (parts.length === 0) parts.push(status.type)
 
   return (
-    <div class="d-flex gap-2 px-2 py-1 f6 color-fg-muted">
+    <div class="agent-status-item">
       <span class="Label Label--secondary Label--small">{status.type}</span>
       <span>{parts.join(' · ')}</span>
     </div>
@@ -22,7 +22,7 @@ export function AgentStatusBar() {
   if (events.length === 0) return null
 
   return (
-    <div class="Box rounded-1 mb-2 color-bg-subtle overflow-hidden">
+    <div class="agent-status-bar">
       {events.map((evt, i) => (
         <StatusItem key={i} status={evt} />
       ))}

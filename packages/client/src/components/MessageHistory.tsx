@@ -14,7 +14,7 @@ export function MessageHistory() {
     return (
       <div class="app-chat">
         <div class="chat-welcome">
-          <p>Select a session to view history</p>
+          <p class="f4 color-fg-muted">Select a session to view history</p>
         </div>
       </div>
     )
@@ -24,7 +24,7 @@ export function MessageHistory() {
     return (
       <div class="app-chat">
         <div class="chat-welcome">
-          <span class="AnimatedEllipsis">Loading</span>
+          <span class="AnimatedEllipsis color-fg-muted">Loading</span>
         </div>
       </div>
     )
@@ -34,7 +34,7 @@ export function MessageHistory() {
     <div class="app-chat">
       <div class="chat-messages">
         {msgs.length === 0 && !streaming.value && (
-          <p class="color-fg-muted">No messages in this session</p>
+          <p class="color-fg-muted f5">No messages in this session</p>
         )}
         {msgs.map((msg) => (
           <div

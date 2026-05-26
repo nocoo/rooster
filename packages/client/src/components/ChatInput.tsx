@@ -30,7 +30,7 @@ export function ChatInput() {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-3 flex-items-end">
         <textarea
           ref={inputRef}
           class="form-control flex-1"
@@ -39,19 +39,20 @@ export function ChatInput() {
           disabled={isStreaming}
           onKeyDown={handleKeyDown}
           aria-label="Message input"
-          style={{ resize: 'none' }}
+          style={{ resize: 'none', borderRadius: '8px' }}
         />
         {isStreaming ? (
           <button
             type="button"
-            class="btn btn-danger"
+            class="btn btn-danger btn-sm"
             onClick={() => { abort() }}
             disabled={isAborting}
+            style={{ whiteSpace: 'nowrap' }}
           >
             {isAborting ? 'Stopping…' : 'Stop'}
           </button>
         ) : (
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="btn btn-primary btn-sm" style={{ whiteSpace: 'nowrap' }}>
             Send
           </button>
         )}
