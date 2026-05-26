@@ -37,6 +37,8 @@ export async function executeBridgeRun(
   const sessionId = payload.session_id ?? crypto.randomUUID()
   ensureSession(sessionStore, sessionId, payload)
 
+  const priorMessages = messageStore.list(sessionId)
+
   messageStore.append({
     session_id: sessionId,
     role: 'user',
@@ -49,6 +51,12 @@ export async function executeBridgeRun(
   if (payload.provider) chatOptions['provider'] = payload.provider
   if (payload.source) chatOptions['source'] = payload.source
   if (payload.instructions) chatOptions['instructions'] = payload.instructions
+  if (priorMessages.length > 0) {
+    chatOptions['conversation_history'] = priorMessages.map((m) => ({
+      role: m.role,
+      content: m.content ?? '',
+    }))
+  }
 
   const chatStarted = await bridge.chat(sessionId, payload.input, chatOptions)
 

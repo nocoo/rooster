@@ -1081,4 +1081,58 @@ describe('Socket.IO /chat-run', () => {
       expect(true).toBe(true)
     })
   })
+
+  describe('run — conversation_history passed on second run', () => {
+    let chatCalls: Array<{ sessionId: string; message: unknown; options: unknown }>
+
+    beforeEach(() => {
+      chatCalls = []
+      const bridge = createMockBridge()
+      const originalChat = bridge.chat.bind(bridge)
+      bridge.chat = (...args: Parameters<typeof bridge.chat>) => {
+        chatCalls.push({ sessionId: args[0], message: args[1], options: args[2] })
+        return originalChat(...args)
+      }
+      setupServer(bridge)
+      connectClient()
+    })
+
+    it('should include prior messages as conversation_history on second run', async () => {
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'first message', session_id: 'sess-history' })
+        })
+      })
+
+      await new Promise<void>((resolve) => {
+        client.on('run.completed', () => { resolve() })
+        client.emit('run', { input: 'second message', session_id: 'sess-history' })
+      })
+
+      expect(chatCalls).toHaveLength(2)
+
+      const firstOpts = chatCalls[0]?.options as Record<string, unknown> | undefined
+      expect(firstOpts?.['conversation_history']).toBeUndefined()
+
+      const secondOpts = chatCalls[1]?.options as Record<string, unknown>
+      const history = secondOpts['conversation_history'] as Array<Record<string, unknown>>
+      expect(history).toHaveLength(2)
+      expect(history[0]).toEqual({ role: 'user', content: 'first message' })
+      expect(history[1]).toEqual({ role: 'assistant', content: 'Hello world' })
+    })
+
+    it('should not include conversation_history on first run', async () => {
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'only message', session_id: 'sess-no-hist' })
+        })
+      })
+
+      expect(chatCalls).toHaveLength(1)
+      const opts = chatCalls[0]?.options as Record<string, unknown> | undefined
+      expect(opts?.['conversation_history']).toBeUndefined()
+    })
+  })
 })
