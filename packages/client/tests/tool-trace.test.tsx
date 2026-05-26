@@ -45,14 +45,14 @@ describe('ToolTrace', () => {
   })
 
   it('should render tool event with running status', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'read_file', status: 'started' }], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'read_file', status: 'started' }], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<ToolTrace />)
     expect(screen.getByText('read_file')).toBeTruthy()
     expect(screen.getByText('running')).toBeTruthy()
   })
 
   it('should render completed tool event with done status', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'bash', status: 'completed', output: 'ok', duration: 150 }], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'bash', status: 'completed', output: 'ok', duration: 150 }], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<ToolTrace />)
     expect(screen.getByText('bash')).toBeTruthy()
     expect(screen.getByText('done')).toBeTruthy()
@@ -60,13 +60,13 @@ describe('ToolTrace', () => {
   })
 
   it('should render tool error', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'write_file', status: 'completed', output: '', error: 'permission denied' }], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'write_file', status: 'completed', output: '', error: 'permission denied' }], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<ToolTrace />)
     expect(screen.getByText('permission denied')).toBeTruthy()
   })
 
   it('should render tool arguments', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'edit', status: 'started', arguments: '{"path":"/foo.ts"}' }], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'edit', status: 'started', arguments: '{"path":"/foo.ts"}' }], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<ToolTrace />)
     expect(screen.getByText('{"path":"/foo.ts"}')).toBeTruthy()
   })
@@ -75,7 +75,7 @@ describe('ToolTrace', () => {
     runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [
       { tool_call_id: 'tc1', name: 'read_file', status: 'completed', output: 'data' },
       { tool_call_id: 'tc2', name: 'bash', status: 'started' },
-    ], agentEvents: [], error: null } }
+    ], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<ToolTrace />)
     expect(screen.getByText('read_file')).toBeTruthy()
     expect(screen.getByText('bash')).toBeTruthy()

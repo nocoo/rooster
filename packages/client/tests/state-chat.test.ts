@@ -8,17 +8,23 @@ import {
   reasoningDone,
   toolEvents,
   agentEvents,
+  pendingApproval,
+  pendingClarify,
   chatError,
   isWorking,
   initChat,
   send,
   abort,
+  respondApproval,
+  respondClarify,
   runStates,
 } from '../src/state/chat.js'
 import { sessions, sessionsTotal, activeSessionId, messages } from '../src/state/sessions.js'
 
 const mockSendRun = vi.fn()
 const mockSendAbort = vi.fn()
+const mockSendApprovalRespond = vi.fn()
+const mockSendClarifyRespond = vi.fn()
 const mockSetHandlers = vi.fn()
 const mockConnect = vi.fn()
 const mockRoute = vi.fn()
@@ -28,6 +34,8 @@ vi.mock('../src/ws/chat.js', () => ({
   setHandlers: (...args: unknown[]) => mockSetHandlers(...args) as unknown,
   sendRun: (...args: unknown[]) => mockSendRun(...args) as unknown,
   sendAbort: (...args: unknown[]) => mockSendAbort(...args) as unknown,
+  sendApprovalRespond: (...args: unknown[]) => mockSendApprovalRespond(...args) as unknown,
+  sendClarifyRespond: (...args: unknown[]) => mockSendClarifyRespond(...args) as unknown,
 }))
 
 vi.mock('preact-router', () => ({
@@ -50,6 +58,8 @@ describe('state/chat', () => {
     messages.value = []
     mockSendRun.mockClear()
     mockSendAbort.mockClear()
+    mockSendApprovalRespond.mockClear()
+    mockSendClarifyRespond.mockClear()
     mockSetHandlers.mockClear()
     mockConnect.mockClear()
     mockRoute.mockClear()
@@ -71,6 +81,10 @@ describe('state/chat', () => {
       expect(typeof handlers['onThinkingDelta']).toBe('function')
       expect(typeof handlers['onReasoningAvailable']).toBe('function')
       expect(typeof handlers['onAgentEvent']).toBe('function')
+      expect(typeof handlers['onApprovalRequested']).toBe('function')
+      expect(typeof handlers['onApprovalResolved']).toBe('function')
+      expect(typeof handlers['onClarifyRequested']).toBe('function')
+      expect(typeof handlers['onClarifyResolved']).toBe('function')
       expect(typeof handlers['onResumed']).toBe('function')
       expect(mockConnect).toHaveBeenCalled()
     })
@@ -79,13 +93,13 @@ describe('state/chat', () => {
   describe('isWorking', () => {
     it('should be true when streaming', () => {
       activeSessionId.value = 'test-session'
-      runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       expect(isWorking.value).toBe(true)
     })
 
     it('should be true when aborting', () => {
       activeSessionId.value = 'test-session'
-      runStates.value = { 'test-session': { streaming: false, aborting: true, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 'test-session': { streaming: false, aborting: true, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       expect(isWorking.value).toBe(true)
     })
 
@@ -149,7 +163,7 @@ describe('state/chat', () => {
   describe('abort', () => {
     it('should call sendAbort when streaming', () => {
       activeSessionId.value = 's1'
-      runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       abort()
       expect(aborting.value).toBe(true)
       expect(mockSendAbort).toHaveBeenCalledWith('s1')
@@ -163,10 +177,54 @@ describe('state/chat', () => {
     })
 
     it('should not abort without active session', () => {
-      runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       abort()
       expect(aborting.value).toBe(false)
       expect(mockSendAbort).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('respondApproval', () => {
+    it('should call sendApprovalRespond and set responding', () => {
+      activeSessionId.value = 's1'
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: { approval_id: 'apr-1', command: 'rm', choices: ['allow', 'deny'] }, clarify: null, error: null } }
+      respondApproval('allow')
+      expect(mockSendApprovalRespond).toHaveBeenCalledWith('s1', 'apr-1', 'allow')
+      expect(pendingApproval.value?.responding).toBe(true)
+    })
+
+    it('should not send when no pending approval', () => {
+      activeSessionId.value = 's1'
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+      respondApproval('allow')
+      expect(mockSendApprovalRespond).not.toHaveBeenCalled()
+    })
+
+    it('should not send without active session', () => {
+      respondApproval('allow')
+      expect(mockSendApprovalRespond).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('respondClarify', () => {
+    it('should call sendClarifyRespond and set responding', () => {
+      activeSessionId.value = 's1'
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: { clarify_id: 'clr-1', question: 'Which?' }, error: null } }
+      respondClarify('option A')
+      expect(mockSendClarifyRespond).toHaveBeenCalledWith('s1', 'clr-1', 'option A')
+      expect(pendingClarify.value?.responding).toBe(true)
+    })
+
+    it('should not send when no pending clarify', () => {
+      activeSessionId.value = 's1'
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+      respondClarify('answer')
+      expect(mockSendClarifyRespond).not.toHaveBeenCalled()
+    })
+
+    it('should not send without active session', () => {
+      respondClarify('answer')
+      expect(mockSendClarifyRespond).not.toHaveBeenCalled()
     })
   })
 
@@ -184,6 +242,10 @@ describe('state/chat', () => {
       onThinkingDelta: Handler
       onReasoningAvailable: Handler
       onAgentEvent: Handler
+      onApprovalRequested: Handler
+      onApprovalResolved: Handler
+      onClarifyRequested: Handler
+      onClarifyResolved: Handler
       onResumed: Handler
     }
 
@@ -224,7 +286,7 @@ describe('state/chat', () => {
     it('handleRunCompleted should add assistant message and reset state', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
-      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'partial', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'partial', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onRunCompleted']({ event: 'run.completed', session_id: 's1', run_id: 'r1', output: 'done' })
       expect(messages.value).toHaveLength(1)
       expect(messages.value[0]?.role).toBe('assistant')
@@ -237,7 +299,7 @@ describe('state/chat', () => {
     it('handleRunCompleted should use streamOutput when payload.output is empty', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
-      runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: 'accumulated content', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: 'accumulated content', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onRunCompleted']({ event: 'run.completed', session_id: 's1', run_id: 'r1', output: '' })
       expect(messages.value[0]?.content).toBe('accumulated content')
     })
@@ -245,7 +307,7 @@ describe('state/chat', () => {
     it('handleRunCompleted should persist reasoning in assistant message', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
-      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'answer', reasoning: 'Let me think step by step', reasoningDone: true, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'answer', reasoning: 'Let me think step by step', reasoningDone: true, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onRunCompleted']({ event: 'run.completed', session_id: 's1', run_id: 'r1', output: 'answer' })
       expect(messages.value[0]?.reasoning).toBe('Let me think step by step')
     })
@@ -253,7 +315,7 @@ describe('state/chat', () => {
     it('handleRunCompleted should omit reasoning when empty', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
-      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'answer', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'answer', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onRunCompleted']({ event: 'run.completed', session_id: 's1', run_id: 'r1', output: 'answer' })
       expect(messages.value[0]?.reasoning).toBeUndefined()
     })
@@ -261,7 +323,7 @@ describe('state/chat', () => {
     it('handleRunFailed should set error and preserve partial output', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
-      runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: 'partial answer', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: 'partial answer', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onRunFailed']({ event: 'run.failed', session_id: 's1', error: 'something broke' })
       expect(chatError.value).toBe('something broke')
       expect(streaming.value).toBe(false)
@@ -272,7 +334,7 @@ describe('state/chat', () => {
     it('handleRunFailed should not add message if no partial output', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
-      runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onRunFailed']({ event: 'run.failed', session_id: 's1', error: 'fail' })
       expect(chatError.value).toBe('fail')
       expect(messages.value).toHaveLength(0)
@@ -315,7 +377,7 @@ describe('state/chat', () => {
     it('handleToolCompleted should update matching tool event', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
-      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'read_file', status: 'started' }], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'read_file', status: 'started' }], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onToolCompleted']({
         event: 'tool.completed', session_id: 's1', run_id: 'r1',
         tool_call_id: 'tc1', tool: 'read_file', name: 'read_file', output: 'data', duration: 100,
@@ -328,7 +390,7 @@ describe('state/chat', () => {
     it('handleToolCompleted should include error when present', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
-      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'read_file', status: 'started' }], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'read_file', status: 'started' }], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onToolCompleted']({
         event: 'tool.completed', session_id: 's1', run_id: 'r1',
         tool_call_id: 'tc1', tool: 'read_file', name: 'read_file', output: '', error: 'not found',
@@ -343,7 +405,7 @@ describe('state/chat', () => {
       runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [
         { tool_call_id: 'tc1', name: 'read_file', status: 'started' },
         { tool_call_id: 'tc2', name: 'bash', status: 'started' },
-      ], agentEvents: [], error: null } }
+      ], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onToolCompleted']({
         event: 'tool.completed', session_id: 's1', run_id: 'r1',
         tool_call_id: 'tc1', tool: 'read_file', name: 'read_file', output: 'ok',
@@ -354,7 +416,7 @@ describe('state/chat', () => {
     it('handleAbortCompleted should reset streaming state', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
-      runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onAbortCompleted']({ event: 'abort.completed', session_id: 's1', run_id: 'r1', synced: true })
       expect(streaming.value).toBe(false)
       expect(aborting.value).toBe(false)
@@ -364,7 +426,7 @@ describe('state/chat', () => {
     it('handleAbortCompleted should ignore different session', () => {
       activeSessionId.value = 's1'
       const h = getHandlers()
-      runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+      runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
       h['onAbortCompleted']({ event: 'abort.completed', session_id: 'other', run_id: 'r1', synced: true })
       expect(streaming.value).toBe(true)
       expect(aborting.value).toBe(true)
@@ -500,6 +562,61 @@ describe('state/chat', () => {
       expect(messages.value[0]?.content).toBe('existing')
     })
 
+    it('handleApprovalRequested should set pending approval', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onApprovalRequested']({
+        event: 'approval.requested', session_id: 's1', run_id: 'r1',
+        approval_id: 'apr-1', command: 'rm -rf /', description: 'Delete all',
+        choices: ['allow', 'deny'], allow_permanent: true, timeout_ms: 30000,
+      })
+      expect(pendingApproval.value).toBeTruthy()
+      expect(pendingApproval.value?.approval_id).toBe('apr-1')
+      expect(pendingApproval.value?.command).toBe('rm -rf /')
+      expect(pendingApproval.value?.description).toBe('Delete all')
+      expect(pendingApproval.value?.choices).toEqual(['allow', 'deny'])
+      expect(pendingApproval.value?.allow_permanent).toBe(true)
+      expect(pendingApproval.value?.timeout_ms).toBe(30000)
+    })
+
+    it('handleApprovalResolved should clear pending approval', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onApprovalRequested']({
+        event: 'approval.requested', session_id: 's1', run_id: 'r1',
+        approval_id: 'apr-1', command: 'ls', choices: ['allow', 'deny'],
+      })
+      expect(pendingApproval.value).toBeTruthy()
+      h['onApprovalResolved']({ event: 'approval.resolved', session_id: 's1', approval_id: 'apr-1', choice: 'allow' })
+      expect(pendingApproval.value).toBeNull()
+    })
+
+    it('handleClarifyRequested should set pending clarify', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onClarifyRequested']({
+        event: 'clarify.requested', session_id: 's1', run_id: 'r1',
+        clarify_id: 'clr-1', question: 'Which file?', choices: ['a.ts', 'b.ts'], timeout_ms: 60000,
+      })
+      expect(pendingClarify.value).toBeTruthy()
+      expect(pendingClarify.value?.clarify_id).toBe('clr-1')
+      expect(pendingClarify.value?.question).toBe('Which file?')
+      expect(pendingClarify.value?.choices).toEqual(['a.ts', 'b.ts'])
+      expect(pendingClarify.value?.timeout_ms).toBe(60000)
+    })
+
+    it('handleClarifyResolved should clear pending clarify', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onClarifyRequested']({
+        event: 'clarify.requested', session_id: 's1', run_id: 'r1',
+        clarify_id: 'clr-1', question: 'Which?',
+      })
+      expect(pendingClarify.value).toBeTruthy()
+      h['onClarifyResolved']({ event: 'clarify.resolved', session_id: 's1', clarify_id: 'clr-1' })
+      expect(pendingClarify.value).toBeNull()
+    })
+
     describe('full event sequence simulation', () => {
       it('should handle agent.event → thinking → tool → message → completed', () => {
         activeSessionId.value = 's1'
@@ -545,7 +662,7 @@ describe('state/chat', () => {
       it('should not pollute current session with other session events', () => {
         activeSessionId.value = 's1'
         const h = getHandlers()
-        runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+        runStates.value = { 's1': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
 
         h['onMessageDelta']({ event: 'message.delta', session_id: 'other', run_id: 'r2', delta: 'x', output: 'x' })
         expect(streamOutput.value).toBe('')
@@ -569,7 +686,7 @@ describe('state/chat', () => {
       it('should clean up session A state when run.completed arrives after switching to B', () => {
         activeSessionId.value = 's1'
         const h = getHandlers()
-        runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'partial', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+        runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'partial', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
 
         activeSessionId.value = 's2'
         h['onRunCompleted']({ event: 'run.completed', session_id: 's1', run_id: 'r1', output: 'final answer' })
@@ -584,7 +701,7 @@ describe('state/chat', () => {
       it('should clean up session A state when run.failed arrives after switching to B', () => {
         activeSessionId.value = 's1'
         const h = getHandlers()
-        runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+        runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
 
         activeSessionId.value = 's2'
         h['onRunFailed']({ event: 'run.failed', session_id: 's1', run_id: 'r1', error: 'timeout' })
@@ -598,7 +715,7 @@ describe('state/chat', () => {
       it('should clean up session A state when abort.completed arrives after switching to B', () => {
         activeSessionId.value = 's1'
         const h = getHandlers()
-        runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+        runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
 
         activeSessionId.value = 's2'
         h['onAbortCompleted']({ event: 'abort.completed', session_id: 's1', run_id: 'r1', synced: true })

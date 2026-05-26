@@ -51,7 +51,7 @@ describe('AgentStatusBar', () => {
       model: 'claude-4',
       provider: 'anthropic',
       tool_count: 30,
-    }], error: null } }
+    }], approval: null, clarify: null, error: null } }
     render(<AgentStatusBar />)
     expect(screen.getByText('status')).toBeTruthy()
     expect(screen.getByText(/profile: coding/)).toBeTruthy()
@@ -61,7 +61,7 @@ describe('AgentStatusBar', () => {
   })
 
   it('should render minimal event with only type', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [{ type: 'custom_event' }], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [{ type: 'custom_event' }], approval: null, clarify: null, error: null } }
     render(<AgentStatusBar />)
     expect(screen.getAllByText('custom_event').length).toBeGreaterThanOrEqual(1)
   })
@@ -70,7 +70,7 @@ describe('AgentStatusBar', () => {
     runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [
       { type: 'init', profile: 'default' },
       { type: 'progress', model: 'gpt-4' },
-    ], error: null } }
+    ], approval: null, clarify: null, error: null } }
     render(<AgentStatusBar />)
     expect(screen.getByText('init')).toBeTruthy()
     expect(screen.getByText('progress')).toBeTruthy()

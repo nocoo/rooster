@@ -106,27 +106,27 @@ describe('ChatInput', () => {
   })
 
   it('should show Stop button when streaming', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<ChatInput />)
     expect(screen.getByText('Stop')).toBeTruthy()
   })
 
   it('should call abort on Stop click', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<ChatInput />)
     fireEvent.click(screen.getByText('Stop'))
     expect(mockAbort).toHaveBeenCalled()
   })
 
   it('should disable Stop button when aborting', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: true, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: true, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<ChatInput />)
     const btn = screen.getByText('Stopping…')
     expect((btn as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('should disable textarea when streaming', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<ChatInput />)
     const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
     expect(textarea.disabled).toBe(true)

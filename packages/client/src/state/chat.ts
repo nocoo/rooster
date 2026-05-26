@@ -5,6 +5,8 @@ import {
   setHandlers,
   sendRun,
   sendAbort,
+  sendApprovalRespond,
+  sendClarifyRespond,
   type ToolEvent,
   type RunStartedPayload,
   type MessageDeltaPayload,
@@ -17,6 +19,10 @@ import {
   type ThinkingDeltaPayload,
   type ReasoningAvailablePayload,
   type AgentEventPayload,
+  type ApprovalRequestedPayload,
+  type ApprovalResolvedPayload,
+  type ClarifyRequestedPayload,
+  type ClarifyResolvedPayload,
   type ResumedPayload,
 } from '../ws/chat.js'
 import { sessions, sessionsTotal, activeSessionId, messages, loadSessions } from './sessions.js'
@@ -33,6 +39,24 @@ export interface AgentStatus {
   [key: string]: unknown
 }
 
+export interface PendingApproval {
+  approval_id: string
+  command: string
+  description?: string
+  choices: string[]
+  allow_permanent?: boolean
+  timeout_ms?: number
+  responding?: boolean
+}
+
+export interface PendingClarify {
+  clarify_id: string
+  question: string
+  choices?: string[]
+  timeout_ms?: number
+  responding?: boolean
+}
+
 export interface RunState {
   streaming: boolean
   aborting: boolean
@@ -42,6 +66,8 @@ export interface RunState {
   reasoningDone: boolean
   tools: ToolEvent[]
   agentEvents: AgentStatus[]
+  approval: PendingApproval | null
+  clarify: PendingClarify | null
   error: string | null
 }
 
@@ -55,6 +81,8 @@ function createRunState(): RunState {
     reasoningDone: false,
     tools: [],
     agentEvents: [],
+    approval: null,
+    clarify: null,
     error: null,
   }
 }
@@ -89,6 +117,8 @@ export const reasoningText = computed(() => activeRunState.value.reasoning)
 export const reasoningDone = computed(() => activeRunState.value.reasoningDone)
 export const toolEvents = computed(() => activeRunState.value.tools)
 export const agentEvents = computed(() => activeRunState.value.agentEvents)
+export const pendingApproval = computed(() => activeRunState.value.approval)
+export const pendingClarify = computed(() => activeRunState.value.clarify)
 export const chatError = computed(() => activeRunState.value.error)
 
 export const isWorking = computed(() => streaming.value || aborting.value)
@@ -107,6 +137,10 @@ export function initChat(): void {
     onThinkingDelta: handleThinkingDelta,
     onReasoningAvailable: handleReasoningAvailable,
     onAgentEvent: handleAgentEvent,
+    onApprovalRequested: handleApprovalRequested,
+    onApprovalResolved: handleApprovalResolved,
+    onClarifyRequested: handleClarifyRequested,
+    onClarifyResolved: handleClarifyResolved,
     onResumed: handleResumed,
   })
   connect()
@@ -143,6 +177,8 @@ export function send(input: string, opts?: { model?: string; profile?: string; p
     reasoningDone: false,
     tools: [],
     agentEvents: [],
+    approval: null,
+    clarify: null,
   })
 
   const payload: Record<string, string> = { input, session_id: sessionId }
@@ -160,6 +196,24 @@ export function abort(): void {
   if (!state.streaming) return
   setState(sessionId, { aborting: true })
   sendAbort(sessionId)
+}
+
+export function respondApproval(choice: string): void {
+  const sessionId = activeSessionId.value
+  if (!sessionId) return
+  const state = getState(sessionId)
+  if (!state.approval) return
+  setState(sessionId, { approval: { ...state.approval, responding: true } })
+  sendApprovalRespond(sessionId, state.approval.approval_id, choice)
+}
+
+export function respondClarify(response: string): void {
+  const sessionId = activeSessionId.value
+  if (!sessionId) return
+  const state = getState(sessionId)
+  if (!state.clarify) return
+  setState(sessionId, { clarify: { ...state.clarify, responding: true } })
+  sendClarifyRespond(sessionId, state.clarify.clarify_id, response)
 }
 
 function handleRunStarted(payload: RunStartedPayload): void {
@@ -282,6 +336,42 @@ function handleAgentEvent(payload: AgentEventPayload): void {
     ...(typeof toolCount === 'number' ? { tool_count: toolCount } : {}),
   }
   setState(payload.session_id, { agentEvents: [...state.agentEvents, status] })
+}
+
+function handleApprovalRequested(payload: ApprovalRequestedPayload): void {
+  pushDebugEvent('approval.requested', payload)
+  setState(payload.session_id, {
+    approval: {
+      approval_id: payload.approval_id,
+      command: payload.command,
+      choices: payload.choices,
+      ...(payload.description ? { description: payload.description } : {}),
+      ...(payload.allow_permanent != null ? { allow_permanent: payload.allow_permanent } : {}),
+      ...(payload.timeout_ms != null ? { timeout_ms: payload.timeout_ms } : {}),
+    },
+  })
+}
+
+function handleApprovalResolved(payload: ApprovalResolvedPayload): void {
+  pushDebugEvent('approval.resolved', payload)
+  setState(payload.session_id, { approval: null })
+}
+
+function handleClarifyRequested(payload: ClarifyRequestedPayload): void {
+  pushDebugEvent('clarify.requested', payload)
+  setState(payload.session_id, {
+    clarify: {
+      clarify_id: payload.clarify_id,
+      question: payload.question,
+      ...(payload.choices ? { choices: payload.choices } : {}),
+      ...(payload.timeout_ms != null ? { timeout_ms: payload.timeout_ms } : {}),
+    },
+  })
+}
+
+function handleClarifyResolved(payload: ClarifyResolvedPayload): void {
+  pushDebugEvent('clarify.resolved', payload)
+  setState(payload.session_id, { clarify: null })
 }
 
 function handleResumed(payload: ResumedPayload): void {

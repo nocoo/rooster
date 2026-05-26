@@ -45,26 +45,26 @@ describe('StreamingMessage', () => {
   })
 
   it('should render output text', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: 'Hello from assistant', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: 'Hello from assistant', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<StreamingMessage />)
     expect(screen.getByText('Hello from assistant')).toBeTruthy()
   })
 
   it('should render streaming label', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: 'partial', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: 'partial', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<StreamingMessage />)
     expect(screen.getByText('Agent')).toBeTruthy()
   })
 
   it('should render reasoning in details element', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: 'output', reasoning: 'thinking process', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: 'output', reasoning: 'thinking process', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<StreamingMessage />)
     expect(screen.getByText('Thinking…')).toBeTruthy()
     expect(screen.getByText('thinking process')).toBeTruthy()
   })
 
   it('should render with only reasoning text', () => {
-    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: 'just thinking', reasoningDone: false, tools: [], agentEvents: [], error: null } }
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: 'just thinking', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
     render(<StreamingMessage />)
     expect(screen.getByText('just thinking')).toBeTruthy()
   })

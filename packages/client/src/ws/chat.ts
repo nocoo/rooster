@@ -108,6 +108,43 @@ export interface AgentEventPayload {
   [key: string]: unknown
 }
 
+export interface ApprovalRequestedPayload {
+  event: 'approval.requested'
+  session_id: string
+  run_id: string
+  approval_id: string
+  command: string
+  description?: string
+  choices: string[]
+  allow_permanent?: boolean
+  timeout_ms?: number
+}
+
+export interface ApprovalResolvedPayload {
+  event: 'approval.resolved'
+  session_id: string
+  run_id?: string
+  approval_id: string
+  choice: string
+}
+
+export interface ClarifyRequestedPayload {
+  event: 'clarify.requested'
+  session_id: string
+  run_id: string
+  clarify_id: string
+  question: string
+  choices?: string[]
+  timeout_ms?: number
+}
+
+export interface ClarifyResolvedPayload {
+  event: 'clarify.resolved'
+  session_id: string
+  run_id?: string
+  clarify_id: string
+}
+
 export interface ResumedPayload {
   event: 'resumed'
   session_id: string
@@ -129,6 +166,10 @@ export type ChatEventHandler = {
   onThinkingDelta?: (payload: ThinkingDeltaPayload) => void
   onReasoningAvailable?: (payload: ReasoningAvailablePayload) => void
   onAgentEvent?: (payload: AgentEventPayload) => void
+  onApprovalRequested?: (payload: ApprovalRequestedPayload) => void
+  onApprovalResolved?: (payload: ApprovalResolvedPayload) => void
+  onClarifyRequested?: (payload: ClarifyRequestedPayload) => void
+  onClarifyResolved?: (payload: ClarifyResolvedPayload) => void
   onResumed?: (payload: ResumedPayload) => void
 }
 
@@ -158,6 +199,10 @@ export function connect(): void {
   socket.on('thinking.delta', (d: ThinkingDeltaPayload) => { handlers.onThinkingDelta?.(d) })
   socket.on('reasoning.available', (d: ReasoningAvailablePayload) => { handlers.onReasoningAvailable?.(d) })
   socket.on('agent.event', (d: AgentEventPayload) => { handlers.onAgentEvent?.(d) })
+  socket.on('approval.requested', (d: ApprovalRequestedPayload) => { handlers.onApprovalRequested?.(d) })
+  socket.on('approval.resolved', (d: ApprovalResolvedPayload) => { handlers.onApprovalResolved?.(d) })
+  socket.on('clarify.requested', (d: ClarifyRequestedPayload) => { handlers.onClarifyRequested?.(d) })
+  socket.on('clarify.resolved', (d: ClarifyResolvedPayload) => { handlers.onClarifyResolved?.(d) })
   socket.on('resumed', (d: ResumedPayload) => { handlers.onResumed?.(d) })
 }
 
@@ -185,6 +230,14 @@ export function sendAbort(sessionId: string): void {
 
 export function sendResume(sessionId: string): void {
   socket?.emit('resume', { session_id: sessionId })
+}
+
+export function sendApprovalRespond(sessionId: string, approvalId: string, choice: string): void {
+  socket?.emit('approval.respond', { session_id: sessionId, approval_id: approvalId, choice })
+}
+
+export function sendClarifyRespond(sessionId: string, clarifyId: string, response: string): void {
+  socket?.emit('clarify.respond', { session_id: sessionId, clarify_id: clarifyId, response })
 }
 
 export function getSocket(): Socket | null {
