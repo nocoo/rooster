@@ -13,5 +13,5 @@
     "exactOptionalPropertyTypes": true,
     "noEmit": true
   },
-  "include": ["*.ts"]
+  "include": ["*.ts", "scripts/**/*.ts"]
 }

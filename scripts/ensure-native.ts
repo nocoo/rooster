@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { execSync } from 'node:child_process'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,11 +5,12 @@ import { createRequire } from 'node:module'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pkg = resolve(root, 'packages/server/node_modules/better-sqlite3')
-const require = createRequire(resolve(pkg, 'index.js'))
+const localBin = resolve(root, 'node_modules/.bin')
+const req = createRequire(resolve(pkg, 'index.js'))
 
-function check() {
+function check(): boolean {
   try {
-    const Database = require('better-sqlite3')
+    const Database = req('better-sqlite3') as new (path: string) => { close(): void }
     const db = new Database(':memory:')
     db.close()
     return true
@@ -25,11 +25,13 @@ if (check()) {
 
 console.log(`[rebuild:native] ABI mismatch detected, rebuilding for Node ${process.version}...`)
 
+const env = { ...process.env, PATH: `${localBin}:${process.env['PATH'] ?? ''}` }
+
 try {
-  execSync('npx --yes prebuild-install', { cwd: pkg, stdio: 'inherit' })
+  execSync('prebuild-install', { cwd: pkg, stdio: 'inherit', env })
 } catch {
   console.log('[rebuild:native] prebuild-install failed, falling back to node-gyp...')
-  execSync('npx --yes node-gyp rebuild --release', { cwd: pkg, stdio: 'inherit' })
+  execSync('node-gyp rebuild --release', { cwd: pkg, stdio: 'inherit', env })
 }
 
 if (check()) {
