@@ -173,6 +173,13 @@ describe('state/chat', () => {
       send('hello')
       expect(mockSendRun).not.toHaveBeenCalled()
     })
+
+    it('should not send when another session is streaming', () => {
+      activeSessionId.value = 's2'
+      runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+      send('hello')
+      expect(mockSendRun).not.toHaveBeenCalled()
+    })
   })
 
   describe('abort', () => {
@@ -771,12 +778,13 @@ describe('state/chat', () => {
       it('should clean up session A state when abort.completed arrives after switching to B', () => {
         activeSessionId.value = 's1'
         const h = getHandlers()
-        runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+        runStates.value = { 's1': { streaming: true, aborting: true, runId: 'r1', output: 'partial from A', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
 
         activeSessionId.value = 's2'
         h['onAbortCompleted']({ event: 'abort.completed', session_id: 's1', run_id: 'r1', synced: true })
 
         expect(runStates.value['s1']).toBeUndefined()
+        expect(messages.value).toHaveLength(0)
 
         activeSessionId.value = 's1'
         expect(streaming.value).toBe(false)

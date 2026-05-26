@@ -261,6 +261,30 @@ describe('Socket.IO /chat-run', () => {
       expect(events[1]?.['event']).toBe('abort.completed')
       expect(events[1]?.['synced']).toBe(true)
     })
+
+    it('should persist partial output to message store on abort', async () => {
+      let gotDelta = false
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('message.delta', () => { gotDelta = true })
+          client.on('run.started', () => {
+            setTimeout(() => {
+              client.emit('abort', { session_id: 'sess-abort-persist' })
+            }, 150)
+          })
+          client.on('abort.completed', () => {
+            setTimeout(resolve, 150)
+          })
+          client.emit('run', { input: 'long task', session_id: 'sess-abort-persist' })
+        })
+      })
+
+      expect(gotDelta).toBe(true)
+      const msgs = messageStore.list('sess-abort-persist')
+      const assistantMsgs = msgs.filter((m) => m.role === 'assistant')
+      expect(assistantMsgs.length).toBeGreaterThanOrEqual(1)
+      expect(assistantMsgs[0]?.content).toBeTruthy()
+    })
   })
 
   describe('abort path — interrupt failure', () => {

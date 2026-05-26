@@ -124,6 +124,9 @@ export const chatError = computed(() => activeRunState.value.error)
 
 export const isWorking = computed(() => streaming.value || aborting.value)
 export const isStreamingHere = computed(() => streaming.value)
+export const anySessionWorking = computed(() =>
+  Object.values(runStates.value).some((s) => s.streaming || s.aborting),
+)
 
 export function initChat(): void {
   setHandlers({
@@ -149,9 +152,8 @@ export function initChat(): void {
 }
 
 export function send(input: string, opts?: { model?: string; profile?: string; provider?: string }): void {
+  if (anySessionWorking.value) return
   const sessionId = activeSessionId.value ?? uuid()
-  const state = getState(sessionId)
-  if (state.streaming || state.aborting) return
 
   if (!activeSessionId.value) {
     activeSessionId.value = sessionId

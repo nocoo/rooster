@@ -140,6 +140,17 @@ export async function executeBridgeRun(
     await delay(100)
   }
 
+  if (output) {
+    const appendInput: Parameters<typeof messageStore.append>[0] = {
+      session_id: sessionId,
+      role: 'assistant',
+      content: output,
+    }
+    if (reasoning) appendInput.reasoning = reasoning
+    messageStore.append(appendInput)
+    sessionStore.updateLastActive(sessionId)
+  }
+
   return { run_id: runId, session_id: sessionId, output, error: 'aborted' }
 }
 

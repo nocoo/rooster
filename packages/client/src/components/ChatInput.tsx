@@ -1,5 +1,5 @@
 import { useRef } from 'preact/hooks'
-import { isStreamingHere, aborting, send, abort } from '../state/chat.js'
+import { isStreamingHere, aborting, anySessionWorking, send, abort } from '../state/chat.js'
 import { selectedModel, selectedProfile, selectedProvider } from '../state/settings.js'
 
 export function ChatInput() {
@@ -30,6 +30,7 @@ export function ChatInput() {
 
   const isStreaming = isStreamingHere.value
   const isAborting = aborting.value
+  const anyWorking = anySessionWorking.value
 
   return (
     <form onSubmit={handleSubmit}>
@@ -39,7 +40,7 @@ export function ChatInput() {
           class="form-control flex-1"
           placeholder="Send a message…"
           rows={1}
-          disabled={isStreaming}
+          disabled={anyWorking}
           onKeyDown={handleKeyDown}
           aria-label="Message input"
           style={{ resize: 'none', borderRadius: '8px', maxHeight: '120px', overflow: 'auto' }}
@@ -55,7 +56,7 @@ export function ChatInput() {
             {isAborting ? 'Stopping…' : 'Stop'}
           </button>
         ) : (
-          <button type="submit" class="btn btn-sm" style={{ whiteSpace: 'nowrap' }}>
+          <button type="submit" class="btn btn-sm" disabled={anyWorking} style={{ whiteSpace: 'nowrap' }}>
             Send
           </button>
         )}

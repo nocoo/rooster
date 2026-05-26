@@ -174,4 +174,21 @@ describe('ChatInput', () => {
     fireEvent.submit(textarea.closest('form') as HTMLFormElement)
     expect(mockSend).toHaveBeenCalledWith('hi', { provider: 'anthropic' })
   })
+
+  it('should disable textarea and Send when another session is working', () => {
+    activeSessionId.value = 's2'
+    runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    expect(textarea.disabled).toBe(true)
+    const sendBtn = screen.getByText('Send')
+    expect((sendBtn as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('should show Stop button for active streaming session even when globally working', () => {
+    activeSessionId.value = 'test-session'
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+    render(<ChatInput />)
+    expect(screen.getByText('Stop')).toBeTruthy()
+  })
 })
