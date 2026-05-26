@@ -60,13 +60,22 @@ export function registerChatRunNamespace(io: Server, deps: ChatRunDeps): void {
     socket.on('abort', (_payload: AbortPayload) => {
       if (!activeRun) return
 
-      void executeAbort(
-        deps.bridge,
-        activeRun.sessionId,
-        activeRun.runId,
-        emitter,
-        activeRun.abortController,
-      )
+      const { sessionId, runId, abortController } = activeRun
+
+      void (async () => {
+        try {
+          await executeAbort(deps.bridge, sessionId, runId, emitter, abortController)
+        } catch (err: unknown) {
+          const error = err instanceof Error ? err.message : 'Unknown error'
+          socket.emit('abort.completed', {
+            event: 'abort.completed',
+            session_id: sessionId,
+            run_id: runId,
+            synced: false,
+            error,
+          })
+        }
+      })()
     })
 
     socket.on('resume', (payload: ResumePayload) => {

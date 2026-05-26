@@ -259,6 +259,40 @@ describe('Socket.IO /chat-run', () => {
     })
   })
 
+  describe('abort path — interrupt failure', () => {
+    it('should emit abort.completed with synced=false on interrupt failure', async () => {
+      const bridge = createMockBridge({
+        outputs: [
+          { delta: 'Working', output: 'Working', cursor: 1, event_cursor: 0, events: [], done: false },
+          { delta: '...', output: 'Working...', cursor: 2, event_cursor: 0, events: [], done: false },
+          { delta: '...', output: 'Working......', cursor: 3, event_cursor: 0, events: [], done: false },
+          { delta: '', output: 'Working......', cursor: 4, event_cursor: 0, events: [], done: true },
+        ],
+      })
+      bridge.interrupt = () => Promise.reject(new Error('Bridge unreachable'))
+      setupServer(bridge)
+      connectClient()
+
+      const abortCompleted = await new Promise<Record<string, unknown>>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.started', () => {
+            setTimeout(() => {
+              client.emit('abort', { session_id: 'sess-abort-fail' })
+            }, 50)
+          })
+          client.on('abort.completed', (d: Record<string, unknown>) => {
+            resolve(d)
+          })
+          client.emit('run', { input: 'long task', session_id: 'sess-abort-fail' })
+        })
+      })
+
+      expect(abortCompleted['event']).toBe('abort.completed')
+      expect(abortCompleted['synced']).toBe(false)
+      expect(abortCompleted['error']).toBe('Bridge unreachable')
+    })
+  })
+
   describe('resume path', () => {
     beforeEach(() => {
       setupServer(createMockBridge())

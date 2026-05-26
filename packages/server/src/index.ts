@@ -1,10 +1,9 @@
-import { serve } from '@hono/node-server'
 import { logger } from './lib/logger.js'
-import { createApp } from './app.js'
 import { getDb } from './services/hermes/db.js'
 import { getBridgeClient } from './services/hermes/agent-bridge.js'
+import { createHttpServer } from './server.js'
 
-const app = createApp({ db: getDb(), bridge: getBridgeClient() })
+const { httpServer } = createHttpServer({ db: getDb(), bridge: getBridgeClient() })
 
 const port = parseInt(process.env['PORT'] ?? '8648', 10)
 const host = process.env['BIND_HOST'] ?? '127.0.0.1'
@@ -16,8 +15,6 @@ if (host !== '127.0.0.1' && host !== 'localhost') {
   )
 }
 
-serve({ fetch: app.fetch, port, hostname: host }, () => {
+httpServer.listen(port, host, () => {
   logger.info('Rooster server listening on http://%s:%d', host, port)
 })
-
-export { app }
