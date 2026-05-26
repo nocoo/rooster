@@ -1200,15 +1200,87 @@ describe('Socket.IO /chat-run', () => {
       connectClient()
     })
 
-    it('should be a no-op when abort is emitted without active run', async () => {
-      await new Promise<void>((resolve) => {
+    it('should respond with error when abort is emitted without active run', async () => {
+      const abortCompleted = await new Promise<Record<string, unknown>>((resolve) => {
         client.on('connect', () => {
+          client.on('abort.completed', (d: Record<string, unknown>) => { resolve(d) })
           client.emit('abort', { session_id: 'sess-norun' })
-          setTimeout(() => { resolve() }, 100)
         })
       })
 
-      expect(true).toBe(true)
+      expect(abortCompleted['synced']).toBe(false)
+      expect(abortCompleted['error']).toBe('No active run for this session')
+    })
+  })
+
+  describe('abort session_id mismatch', () => {
+    let interruptCalled: boolean
+
+    beforeEach(() => {
+      interruptCalled = false
+      const bridge = createMockBridge({
+        outputs: [
+          { delta: 'Working', output: 'Working', cursor: 1, event_cursor: 0, events: [], done: false },
+          { delta: '...', output: 'Working...', cursor: 2, event_cursor: 0, events: [], done: false },
+          { delta: '...', output: 'Working......', cursor: 3, event_cursor: 0, events: [], done: false },
+          { delta: '', output: 'Working......', cursor: 4, event_cursor: 0, events: [], done: true },
+        ],
+      })
+      const origInterrupt = bridge.interrupt.bind(bridge)
+      bridge.interrupt = (...args: Parameters<typeof bridge.interrupt>) => {
+        interruptCalled = true
+        return origInterrupt(...args)
+      }
+      setupServer(bridge)
+      connectClient()
+    })
+
+    it('should not interrupt active run when abort targets a different session', async () => {
+      const abortCompleted = await new Promise<Record<string, unknown>>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.started', () => {
+            setTimeout(() => {
+              client.on('abort.completed', (d: Record<string, unknown>) => { resolve(d) })
+              client.emit('abort', { session_id: 'sess-B' })
+            }, 50)
+          })
+          client.emit('run', { input: 'long task', session_id: 'sess-A' })
+        })
+      })
+
+      expect(interruptCalled).toBe(false)
+      expect(abortCompleted['session_id']).toBe('sess-B')
+      expect(abortCompleted['synced']).toBe(false)
+      expect(abortCompleted['error']).toBe('No active run for this session')
+    })
+
+    it('should allow the active run to complete normally after mismatched abort', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.started', () => {
+            setTimeout(() => {
+              client.emit('abort', { session_id: 'sess-B' })
+            }, 50)
+          })
+          client.on('abort.completed', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', (d: Record<string, unknown>) => {
+            events.push(d)
+            resolve()
+          })
+          client.emit('run', { input: 'long task', session_id: 'sess-A' })
+        })
+      })
+
+      expect(interruptCalled).toBe(false)
+      const abortEvt = events.find((e) => e['event'] === 'abort.completed')
+      expect(abortEvt?.['session_id']).toBe('sess-B')
+      expect(abortEvt?.['synced']).toBe(false)
+
+      const completed = events.find((e) => e['event'] === 'run.completed')
+      expect(completed?.['session_id']).toBe('sess-A')
+      expect(completed?.['output']).toBe('Working......')
     })
   })
 

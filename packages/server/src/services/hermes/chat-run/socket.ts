@@ -57,8 +57,17 @@ export function registerChatRunNamespace(io: Server, deps: ChatRunDeps): void {
       })()
     })
 
-    socket.on('abort', (_payload: AbortPayload) => {
-      if (!activeRun) return
+    socket.on('abort', (payload: AbortPayload) => {
+      if (!activeRun || activeRun.sessionId !== payload.session_id) {
+        socket.emit('abort.completed', {
+          event: 'abort.completed',
+          session_id: payload.session_id,
+          run_id: '',
+          synced: false,
+          error: 'No active run for this session',
+        })
+        return
+      }
 
       const { sessionId, runId, abortController } = activeRun
 
