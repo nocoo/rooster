@@ -4,6 +4,7 @@ import { ChatInput } from './ChatInput.js'
 import { StreamingMessage } from './StreamingMessage.js'
 import { ToolTrace } from './ToolTrace.js'
 import { AgentStatusBar } from './AgentStatusBar.js'
+import { Markdown } from './Markdown.js'
 
 export function MessageHistory() {
   const msgs = messages.value
@@ -47,7 +48,11 @@ export function MessageHistory() {
               </span>
               <span class="color-fg-muted">{new Date(msg.timestamp).toLocaleTimeString()}</span>
             </div>
-            <div class="message-content">{msg.content}</div>
+            {msg.role === 'assistant' ? (
+              <Markdown content={msg.content} />
+            ) : (
+              <div class="message-content">{msg.content}</div>
+            )}
           </div>
         ))}
         {streaming.value && (

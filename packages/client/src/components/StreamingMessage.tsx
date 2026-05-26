@@ -1,4 +1,5 @@
 import { streamOutput, reasoningText } from '../state/chat.js'
+import { Markdown } from './Markdown.js'
 
 export function StreamingMessage() {
   const output = streamOutput.value
@@ -18,7 +19,7 @@ export function StreamingMessage() {
           <pre>{reasoning}</pre>
         </details>
       )}
-      {output && <div class="message-content">{output}</div>}
+      {output && <Markdown content={output} />}
     </div>
   )
 }
