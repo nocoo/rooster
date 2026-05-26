@@ -66,6 +66,7 @@ describe('CompressionIndicator', () => {
         summaryTokens: 3200,
         totalMessages: 42,
         resultMessages: 8,
+        source: 'auto',
       },
     }
     const { container } = render(<CompressionIndicator />)
@@ -75,6 +76,7 @@ describe('CompressionIndicator', () => {
     expect(el?.textContent).toContain('128.0k → 24.0k tokens')
     expect(el?.textContent).toContain('summary: 3.2k')
     expect(el?.textContent).toContain('42 → 8 messages')
+    expect(el?.textContent).toContain('source: auto')
   })
 
   it('should render compressing state with minimal fields', () => {

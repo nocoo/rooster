@@ -167,6 +167,7 @@ export interface CompressionCompletedPayload {
   session_id: string
   run_id: string
   request_id?: string
+  source?: string
   compressed?: boolean
   totalMessages?: number
   resultMessages?: number

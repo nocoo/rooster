@@ -861,6 +861,7 @@ describe('state/chat', () => {
         session_id: 's1',
         run_id: 'r1',
         request_id: 'comp-1',
+        source: 'auto',
         compressed: true,
         totalMessages: 30,
         resultMessages: 6,
@@ -872,6 +873,7 @@ describe('state/chat', () => {
       expect(compressionStates.value['s1']).toEqual({
         status: 'completed',
         request_id: 'comp-1',
+        source: 'auto',
         compressed: true,
         totalMessages: 30,
         resultMessages: 6,

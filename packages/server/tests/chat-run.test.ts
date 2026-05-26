@@ -1740,6 +1740,7 @@ describe('Socket.IO /chat-run', () => {
             events: [{
               event: 'compression.completed',
               request_id: 'comp-1',
+              source: 'auto',
               compressed: true,
               totalMessages: 42,
               resultMessages: 8,
@@ -1800,6 +1801,7 @@ describe('Socket.IO /chat-run', () => {
       expect(events[0]?.['session_id']).toBe('sess-comp2')
       expect(events[0]?.['run_id']).toBe('run-1')
       expect(events[0]?.['request_id']).toBe('comp-1')
+      expect(events[0]?.['source']).toBe('auto')
       expect(events[0]?.['compressed']).toBe(true)
       expect(events[0]?.['totalMessages']).toBe(42)
       expect(events[0]?.['resultMessages']).toBe(8)

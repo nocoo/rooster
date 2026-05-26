@@ -276,6 +276,7 @@ function emitBridgeEvent(
       session_id: sessionId,
       run_id: runId,
       request_id: str(evt['request_id']) || undefined,
+      source: str(evt['source']) || undefined,
       compressed: evt['compressed'] === true ? true : evt['compressed'] === false ? false : undefined,
       totalMessages: typeof evt['totalMessages'] === 'number' ? evt['totalMessages'] : undefined,
       resultMessages: typeof evt['resultMessages'] === 'number' ? evt['resultMessages'] : undefined,

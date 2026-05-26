@@ -42,6 +42,9 @@ export function CompressionIndicator() {
           {state.totalMessages} → {state.resultMessages} messages
         </span>
       )}
+      {state.source && (
+        <span class="compression-indicator-detail">source: {state.source}</span>
+      )}
     </div>
   )
 }

@@ -455,6 +455,7 @@ function handleCompressionCompleted(payload: CompressionCompletedPayload): void 
     [payload.session_id]: {
       status: 'completed',
       ...(payload.request_id ? { request_id: payload.request_id } : {}),
+      ...(payload.source ? { source: payload.source } : {}),
       ...(payload.compressed != null ? { compressed: payload.compressed } : {}),
       ...(payload.totalMessages != null ? { totalMessages: payload.totalMessages } : {}),
       ...(payload.resultMessages != null ? { resultMessages: payload.resultMessages } : {}),
