@@ -5,8 +5,7 @@ export default defineConfig({
   plugins: [preact()],
   server: {
     port: 7037,
-    host: '0.0.0.0',
-    allowedHosts: true,
+    allowedHosts: ['rooster.dev.hexly.ai'],
     proxy: {
       '/api': 'http://localhost:7038',
       '/socket.io': {
