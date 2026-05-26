@@ -89,7 +89,9 @@ export async function executeBridgeRun(
     eventCursor = chunk.event_cursor
 
     if (chunk.done) {
-      output = chunk.output
+      output = chunk.output || output
+
+      const terminalError = detectTerminalError(chunk)
 
       messageStore.append({
         session_id: sessionId,
@@ -99,16 +101,26 @@ export async function executeBridgeRun(
 
       sessionStore.updateLastActive(sessionId)
 
-      emitter.emit('run.completed', {
-        event: 'run.completed',
-        session_id: sessionId,
-        run_id: runId,
-        output,
-        result: chunk.result ?? null,
-        error: chunk.error ?? null,
-      })
+      if (terminalError) {
+        emitter.emit('run.failed', {
+          event: 'run.failed',
+          session_id: sessionId,
+          run_id: runId,
+          error: terminalError,
+          output,
+        })
+      } else {
+        emitter.emit('run.completed', {
+          event: 'run.completed',
+          session_id: sessionId,
+          run_id: runId,
+          output,
+          result: chunk.result ?? null,
+          error: null,
+        })
+      }
 
-      return { run_id: runId, session_id: sessionId, output, error: chunk.error }
+      return { run_id: runId, session_id: sessionId, output, error: terminalError ?? chunk.error }
     }
 
     await delay(100)
@@ -117,22 +129,87 @@ export async function executeBridgeRun(
   return { run_id: runId, session_id: sessionId, output, error: 'aborted' }
 }
 
+function summarizeArgs(args: unknown): string {
+  if (!args) return ''
+  const str = typeof args === 'string' ? args : JSON.stringify(args)
+  return str.length > 120 ? str.slice(0, 117) + '...' : str
+}
+
+function str(value: unknown, fallback = ''): string {
+  if (typeof value === 'string') return value
+  if (value == null) return fallback
+  return JSON.stringify(value)
+}
+
 function emitBridgeEvent(
   emitter: RunEmitter,
   sessionId: string,
   runId: string,
   evt: Record<string, unknown>,
 ): void {
-  const type = evt['type'] as string | undefined
+  const type = str(evt['event']) || str(evt['type'])
   if (!type) return
 
-  if (type === 'tool.started' || type === 'tool.completed') {
-    emitter.emit(type, { ...evt, event: type, session_id: sessionId, run_id: runId })
-  } else if (type === 'reasoning.delta' || type === 'reasoning.available') {
-    emitter.emit(type, { ...evt, event: type, session_id: sessionId, run_id: runId })
+  if (type === 'tool.started') {
+    const toolName = str(evt['tool_name']) || str(evt['tool']) || str(evt['name'])
+    const rawArgs = evt['args'] ?? evt['arguments'] ?? {}
+    const argsStr = typeof rawArgs === 'string' ? rawArgs : JSON.stringify(rawArgs)
+    const preview = str(evt['preview']) || str(evt['result_preview']) || summarizeArgs(rawArgs)
+    emitter.emit('tool.started', {
+      event: 'tool.started',
+      session_id: sessionId,
+      run_id: runId,
+      tool_call_id: evt['tool_call_id'] ?? `tc_${Date.now().toString(36)}`,
+      tool: toolName,
+      name: toolName,
+      arguments: argsStr,
+      preview,
+    })
+  } else if (type === 'tool.completed') {
+    const toolName = str(evt['tool_name']) || str(evt['tool']) || str(evt['name'])
+    const output = str(evt['output']) || str(evt['result']) || str(evt['result_preview'])
+    const hasError = Boolean(evt['error'] || evt['is_error'])
+    emitter.emit('tool.completed', {
+      event: 'tool.completed',
+      session_id: sessionId,
+      run_id: runId,
+      tool_call_id: evt['tool_call_id'] ?? '',
+      tool: toolName,
+      name: toolName,
+      output,
+      duration: typeof evt['duration'] === 'number' ? evt['duration'] : undefined,
+      error: hasError ? str(evt['error']) || str(evt['is_error']) : undefined,
+    })
+  } else if (type === 'reasoning.delta' || type === 'thinking.delta') {
+    emitter.emit(type, {
+      event: type,
+      session_id: sessionId,
+      run_id: runId,
+      text: str(evt['text']),
+    })
+  } else if (type === 'reasoning.available') {
+    emitter.emit('reasoning.available', {
+      event: 'reasoning.available',
+      session_id: sessionId,
+      run_id: runId,
+    })
   } else {
-    emitter.emit('agent.event', { ...evt, event: 'agent.event', session_id: sessionId, run_id: runId })
+    emitter.emit('agent.event', { ...evt, event: 'agent.event', type, session_id: sessionId, run_id: runId })
   }
+}
+
+function detectTerminalError(chunk: AgentBridgeOutput): string | null {
+  if (chunk.status === 'error') {
+    return typeof chunk.error === 'string' ? chunk.error : 'Agent run failed'
+  }
+  const result = chunk.result && typeof chunk.result === 'object' && !Array.isArray(chunk.result)
+    ? chunk.result as Record<string, unknown>
+    : null
+  if (result?.failed === true || result?.completed === false) {
+    const msg = result['error'] ?? result['message']
+    return typeof msg === 'string' ? msg : 'Agent reported failure'
+  }
+  return null
 }
 
 function ensureSession(store: SessionStore, sessionId: string, payload: RunPayload): void {

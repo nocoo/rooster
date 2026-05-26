@@ -175,7 +175,7 @@ describe('Socket.IO /chat-run', () => {
             output: '',
             cursor: 1,
             event_cursor: 1,
-            events: [{ type: 'tool.started', tool_call_id: 'tc-1', tool: 'read_file', name: 'read_file', arguments: '{}' }],
+            events: [{ event: 'tool.started', tool_name: 'read_file', args: { path: '/tmp/x' }, tool_call_id: 'tc-1' }],
             done: false,
           },
           {
@@ -183,7 +183,7 @@ describe('Socket.IO /chat-run', () => {
             output: '',
             cursor: 2,
             event_cursor: 2,
-            events: [{ type: 'tool.completed', tool_call_id: 'tc-1', tool: 'read_file', name: 'read_file', output: 'file contents', duration: 50 }],
+            events: [{ event: 'tool.completed', tool_name: 'read_file', tool_call_id: 'tc-1', result: 'file contents', duration: 50 }],
             done: false,
           },
           {
@@ -214,9 +214,11 @@ describe('Socket.IO /chat-run', () => {
       expect(events[0]?.['event']).toBe('tool.started')
       expect(events[0]?.['tool_call_id']).toBe('tc-1')
       expect(events[0]?.['name']).toBe('read_file')
+      expect(events[0]?.['arguments']).toBe('{"path":"/tmp/x"}')
 
       expect(events[1]?.['event']).toBe('tool.completed')
       expect(events[1]?.['output']).toBe('file contents')
+      expect(events[1]?.['duration']).toBe(50)
     })
   })
 
@@ -377,7 +379,7 @@ describe('Socket.IO /chat-run', () => {
             output: '',
             cursor: 1,
             event_cursor: 1,
-            events: [{ type: 'reasoning.delta', text: 'thinking...' }],
+            events: [{ event: 'reasoning.delta', text: 'thinking...' }],
             done: false,
           },
           {
@@ -385,7 +387,7 @@ describe('Socket.IO /chat-run', () => {
             output: '',
             cursor: 2,
             event_cursor: 2,
-            events: [{ type: 'reasoning.available' }],
+            events: [{ event: 'reasoning.available' }],
             done: false,
           },
           {
@@ -429,7 +431,7 @@ describe('Socket.IO /chat-run', () => {
             cursor: 1,
             event_cursor: 2,
             events: [
-              { type: 'custom.event', data: 'payload' },
+              { event: 'custom.event', data: 'payload' },
               { noType: true },
             ],
             done: false,
@@ -461,6 +463,476 @@ describe('Socket.IO /chat-run', () => {
       expect(events).toHaveLength(1)
       expect(events[0]?.['event']).toBe('agent.event')
       expect(events[0]?.['data']).toBe('payload')
+      expect(events[0]?.['type']).toBe('custom.event')
+    })
+  })
+
+  describe('run — thinking.delta forwarded as thinking.delta', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'thinking.delta', text: 'let me think...' }],
+            done: false,
+          },
+          {
+            delta: 'Answer',
+            output: 'Answer',
+            cursor: 2,
+            event_cursor: 1,
+            events: [],
+            done: true,
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should emit thinking.delta event', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('thinking.delta', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'think', session_id: 'sess-think' })
+        })
+      })
+
+      expect(events[0]?.['event']).toBe('thinking.delta')
+      expect(events[0]?.['text']).toBe('let me think...')
+      expect(events[0]?.['session_id']).toBe('sess-think')
+      expect(events[0]?.['run_id']).toBe('run-1')
+    })
+  })
+
+  describe('run — bridge terminal error emits run.failed', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: 'partial',
+            output: 'partial',
+            cursor: 1,
+            event_cursor: 0,
+            events: [],
+            done: false,
+          },
+          {
+            delta: '',
+            output: 'partial',
+            cursor: 2,
+            event_cursor: 0,
+            events: [],
+            done: true,
+            status: 'error',
+            error: 'rate limit exceeded',
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should emit run.failed when bridge reports terminal error', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.failed', (d: Record<string, unknown>) => {
+            events.push(d)
+            resolve()
+          })
+          client.on('run.completed', (d: Record<string, unknown>) => {
+            events.push(d)
+            resolve()
+          })
+          client.emit('run', { input: 'fail', session_id: 'sess-fail' })
+        })
+      })
+
+      expect(events[0]?.['event']).toBe('run.failed')
+      expect(events[0]?.['error']).toBe('rate limit exceeded')
+      expect(events[0]?.['output']).toBe('partial')
+    })
+  })
+
+  describe('run — bridge result.failed terminal error', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: 'working',
+            output: 'working',
+            cursor: 1,
+            event_cursor: 0,
+            events: [],
+            done: true,
+            status: 'complete',
+            result: { failed: true, error: 'Task could not be completed' },
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should emit run.failed when result.failed is true', async () => {
+      const failed = await new Promise<Record<string, unknown>>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.failed', (d: Record<string, unknown>) => { resolve(d) })
+          client.emit('run', { input: 'fail', session_id: 'sess-result-fail' })
+        })
+      })
+
+      expect(failed['event']).toBe('run.failed')
+      expect(failed['error']).toBe('Task could not be completed')
+    })
+  })
+
+  describe('run — tool events with legacy type field fallback', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ type: 'tool.started', tool_name: 'Write', args: { path: '/tmp/a.ts', content: 'x' } }],
+            done: false,
+          },
+          {
+            delta: '',
+            output: '',
+            cursor: 2,
+            event_cursor: 2,
+            events: [{ type: 'tool.completed', tool_name: 'Write', tool_call_id: 'tc-w', result_preview: 'written', duration: 30, is_error: true }],
+            done: false,
+          },
+          {
+            delta: 'Done.',
+            output: 'Done.',
+            cursor: 3,
+            event_cursor: 2,
+            events: [],
+            done: true,
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should handle type field fallback and is_error mapping', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('tool.started', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('tool.completed', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'write', session_id: 'sess-legacy' })
+        })
+      })
+
+      expect(events[0]?.['name']).toBe('Write')
+      expect(events[0]?.['arguments']).toBe('{"path":"/tmp/a.ts","content":"x"}')
+      expect(events[0]?.['tool_call_id']).toBeDefined()
+
+      expect(events[1]?.['name']).toBe('Write')
+      expect(events[1]?.['output']).toBe('written')
+      expect(events[1]?.['error']).toBe('true')
+      expect(events[1]?.['duration']).toBe(30)
+    })
+  })
+
+  describe('run — bridge terminal error without string error', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 0,
+            events: [],
+            done: true,
+            status: 'error',
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should emit run.failed with default message when error is not a string', async () => {
+      const failed = await new Promise<Record<string, unknown>>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.failed', (d: Record<string, unknown>) => { resolve(d) })
+          client.emit('run', { input: 'fail', session_id: 'sess-no-err-str' })
+        })
+      })
+
+      expect(failed['error']).toBe('Agent run failed')
+    })
+  })
+
+  describe('run — bridge result.completed=false without string message', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 0,
+            events: [],
+            done: true,
+            status: 'complete',
+            result: { completed: false },
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should emit run.failed with default failure message', async () => {
+      const failed = await new Promise<Record<string, unknown>>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.failed', (d: Record<string, unknown>) => { resolve(d) })
+          client.emit('run', { input: 'fail', session_id: 'sess-incomplete' })
+        })
+      })
+
+      expect(failed['error']).toBe('Agent reported failure')
+    })
+  })
+
+  describe('run — output fallback from accumulated stream', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: 'Hello',
+            output: 'Hello',
+            cursor: 1,
+            event_cursor: 0,
+            events: [],
+            done: false,
+          },
+          {
+            delta: ' world',
+            output: 'Hello world',
+            cursor: 2,
+            event_cursor: 0,
+            events: [],
+            done: false,
+          },
+          {
+            delta: '',
+            output: '',
+            cursor: 3,
+            event_cursor: 0,
+            events: [],
+            done: true,
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should use accumulated output when final chunk.output is empty', async () => {
+      const completed = await new Promise<Record<string, unknown>>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.completed', (d: Record<string, unknown>) => { resolve(d) })
+          client.emit('run', { input: 'hello', session_id: 'sess-accum' })
+        })
+      })
+
+      expect(completed['output']).toBe('Hello world')
+    })
+  })
+
+  describe('run — tool events with string arguments and no tool_call_id', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'tool.started', tool_name: 'Edit', arguments: '{"file":"/a.ts"}', preview: 'editing file' }],
+            done: false,
+          },
+          {
+            delta: '',
+            output: '',
+            cursor: 2,
+            event_cursor: 2,
+            events: [{ event: 'tool.completed', tool_name: 'Edit', result: 'ok' }],
+            done: false,
+          },
+          {
+            delta: 'Done.',
+            output: 'Done.',
+            cursor: 3,
+            event_cursor: 2,
+            events: [],
+            done: true,
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should pass through string arguments and generate missing tool_call_id', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('tool.started', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('tool.completed', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'edit', session_id: 'sess-str-args' })
+        })
+      })
+
+      expect(events[0]?.['arguments']).toBe('{"file":"/a.ts"}')
+      expect(events[0]?.['preview']).toBe('editing file')
+      expect(events[0]?.['tool_call_id']).toMatch(/^tc_/)
+
+      expect(events[1]?.['tool_call_id']).toBe('')
+      expect(events[1]?.['duration']).toBeUndefined()
+      expect(events[1]?.['error']).toBeUndefined()
+    })
+  })
+
+  describe('run — tool.started preview falls back to summarized args', () => {
+    beforeEach(() => {
+      const longContent = 'x'.repeat(200)
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'tool.started', tool_name: 'Write', args: { path: '/tmp/a.ts', content: longContent }, tool_call_id: 'tc-long' }],
+            done: false,
+          },
+          {
+            delta: 'Done.',
+            output: 'Done.',
+            cursor: 2,
+            event_cursor: 1,
+            events: [],
+            done: true,
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should truncate preview from long args', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('tool.started', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'write long', session_id: 'sess-long-args' })
+        })
+      })
+
+      const preview = events[0]?.['preview'] as string
+      expect(preview.length).toBeLessThanOrEqual(120)
+      expect(preview).toMatch(/\.\.\.$/)
+    })
+  })
+
+  describe('run — full event sequence with real bridge field names', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'thinking.delta', text: 'hmm' }],
+            done: false,
+          },
+          {
+            delta: '',
+            output: '',
+            cursor: 2,
+            event_cursor: 3,
+            events: [
+              { event: 'reasoning.delta', text: 'analyzing...' },
+              { event: 'tool.started', tool_name: 'Bash', args: { command: 'ls' }, tool_call_id: 'tc-99' },
+            ],
+            done: false,
+          },
+          {
+            delta: '',
+            output: '',
+            cursor: 3,
+            event_cursor: 4,
+            events: [{ event: 'tool.completed', tool_name: 'Bash', tool_call_id: 'tc-99', result: 'src\npackage.json', duration: 120, is_error: false }],
+            done: false,
+          },
+          {
+            delta: 'Here are the files.',
+            output: 'Here are the files.',
+            cursor: 4,
+            event_cursor: 4,
+            events: [],
+            done: true,
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should emit thinking, reasoning, tool, delta, completed in order', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('thinking.delta', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('reasoning.delta', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('tool.started', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('tool.completed', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('message.delta', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', (d: Record<string, unknown>) => {
+            events.push(d)
+            resolve()
+          })
+          client.emit('run', { input: 'list files', session_id: 'sess-full' })
+        })
+      })
+
+      expect(events[0]?.['event']).toBe('thinking.delta')
+      expect(events[0]?.['text']).toBe('hmm')
+
+      expect(events[1]?.['event']).toBe('reasoning.delta')
+      expect(events[1]?.['text']).toBe('analyzing...')
+
+      expect(events[2]?.['event']).toBe('tool.started')
+      expect(events[2]?.['name']).toBe('Bash')
+      expect(events[2]?.['arguments']).toBe('{"command":"ls"}')
+
+      expect(events[3]?.['event']).toBe('tool.completed')
+      expect(events[3]?.['output']).toBe('src\npackage.json')
+      expect(events[3]?.['duration']).toBe(120)
+
+      expect(events[4]?.['event']).toBe('message.delta')
+      expect(events[4]?.['delta']).toBe('Here are the files.')
+
+      expect(events[5]?.['event']).toBe('run.completed')
+      expect(events[5]?.['output']).toBe('Here are the files.')
     })
   })
 
