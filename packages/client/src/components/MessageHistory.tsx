@@ -5,6 +5,7 @@ import { StreamingMessage } from './StreamingMessage.js'
 import { ToolTrace } from './ToolTrace.js'
 import { AgentStatusBar } from './AgentStatusBar.js'
 import { Markdown } from './Markdown.js'
+import { ReasoningBlock } from './ReasoningBlock.js'
 
 export function MessageHistory() {
   const msgs = messages.value
@@ -49,7 +50,12 @@ export function MessageHistory() {
               <span class="color-fg-muted">{new Date(msg.timestamp).toLocaleTimeString()}</span>
             </div>
             {msg.role === 'assistant' ? (
-              <Markdown content={msg.content} />
+              <>
+                {msg.reasoning && (
+                  <ReasoningBlock reasoning={msg.reasoning} done={true} />
+                )}
+                <Markdown content={msg.content} />
+              </>
             ) : (
               <div class="message-content">{msg.content}</div>
             )}

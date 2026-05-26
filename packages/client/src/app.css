@@ -296,22 +296,56 @@ html, body, #app {
   margin-bottom: 8px;
 }
 
-.streaming-reasoning {
+/* Reasoning/thinking block */
+.reasoning-block {
   margin-bottom: 8px;
+  border: 1px solid var(--borderColor-muted, var(--color-border-muted));
+  border-radius: 6px;
+  overflow: hidden;
 }
 
-.streaming-reasoning summary {
+.reasoning-block-summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
   color: var(--fgColor-muted, var(--color-fg-muted));
   cursor: pointer;
-  padding: 4px 0;
+  padding: 6px 8px;
+  list-style: none;
+  user-select: none;
 }
 
-.streaming-reasoning pre {
+.reasoning-block-summary::-webkit-details-marker {
+  display: none;
+}
+
+.reasoning-block-icon {
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.reasoning-block[open] > .reasoning-block-summary .reasoning-block-icon {
+  transform: rotate(90deg);
+}
+
+.reasoning-block-label {
+  font-weight: 500;
+}
+
+.reasoning-block-content {
+  padding: 0 8px 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.reasoning-block-text {
   font-size: 12px;
+  line-height: 1.5;
   color: var(--fgColor-muted, var(--color-fg-muted));
-  margin-top: 4px;
+  margin: 0;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Tool trace */

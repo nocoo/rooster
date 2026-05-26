@@ -1,9 +1,11 @@
-import { streamOutput, reasoningText } from '../state/chat.js'
+import { streamOutput, reasoningText, reasoningDone } from '../state/chat.js'
 import { Markdown } from './Markdown.js'
+import { ReasoningBlock } from './ReasoningBlock.js'
 
 export function StreamingMessage() {
   const output = streamOutput.value
   const reasoning = reasoningText.value
+  const done = reasoningDone.value
 
   if (!output && !reasoning) return null
 
@@ -13,12 +15,7 @@ export function StreamingMessage() {
         <span class="Label Label--secondary Label--small">Agent</span>
         <span class="AnimatedEllipsis color-fg-muted f6">streaming</span>
       </div>
-      {reasoning && (
-        <details class="streaming-reasoning">
-          <summary>Reasoning</summary>
-          <pre>{reasoning}</pre>
-        </details>
-      )}
+      <ReasoningBlock reasoning={reasoning} done={done} streaming={true} />
       {output && <Markdown content={output} />}
     </div>
   )

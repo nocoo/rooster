@@ -57,4 +57,29 @@ describe('MessageHistory', () => {
     expect(screen.getByText('Human')).toBeTruthy()
     expect(screen.getByText('Agent')).toBeTruthy()
   })
+
+  it('should render reasoning block for assistant messages with reasoning', () => {
+    sessions.value = [{ id: 's1', title: 'Chat', started_at: '2025-01-01', last_active: '2025-01-01' }]
+    activeSessionId.value = 's1'
+    messages.value = [
+      { id: 'm1', session_id: 's1', role: 'assistant', content: 'Answer', reasoning: 'Let me think...', timestamp: '2025-01-01T12:00:00Z' },
+    ]
+
+    render(<MessageHistory />)
+    expect(screen.getByText('Reasoning')).toBeTruthy()
+    expect(screen.getByText('Let me think...')).toBeTruthy()
+    expect(screen.getByText('Answer')).toBeTruthy()
+  })
+
+  it('should not render reasoning block when reasoning is empty', () => {
+    sessions.value = [{ id: 's1', title: 'Chat', started_at: '2025-01-01', last_active: '2025-01-01' }]
+    activeSessionId.value = 's1'
+    messages.value = [
+      { id: 'm1', session_id: 's1', role: 'assistant', content: 'Just an answer', timestamp: '2025-01-01T12:00:00Z' },
+    ]
+
+    const { container } = render(<MessageHistory />)
+    expect(container.querySelector('.reasoning-block')).toBeNull()
+    expect(screen.getByText('Just an answer')).toBeTruthy()
+  })
 })

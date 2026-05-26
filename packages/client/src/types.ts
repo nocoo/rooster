@@ -14,6 +14,7 @@ export interface Message {
   session_id: string
   role: 'user' | 'assistant' | 'system'
   content: string
+  reasoning?: string | null
   timestamp: string
 }
 

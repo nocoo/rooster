@@ -59,7 +59,7 @@ describe('StreamingMessage', () => {
   it('should render reasoning in details element', () => {
     runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: 'output', reasoning: 'thinking process', reasoningDone: false, tools: [], agentEvents: [], error: null } }
     render(<StreamingMessage />)
-    expect(screen.getByText('Reasoning')).toBeTruthy()
+    expect(screen.getByText('Thinking…')).toBeTruthy()
     expect(screen.getByText('thinking process')).toBeTruthy()
   })
 
