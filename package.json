@@ -5,6 +5,7 @@
   "trustedDependencies": ["better-sqlite3"],
   "scripts": {
     "dev": "bun run --filter '*' dev",
+    "dev:bridge": "bash scripts/start-bridge.sh",
     "build": "bun run --filter '*' build",
     "rebuild:native": "tsx scripts/ensure-native.ts",
     "test": "bun run rebuild:native && vitest run",
