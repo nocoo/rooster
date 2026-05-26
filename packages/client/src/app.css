@@ -432,6 +432,7 @@ html, body, #app {
 /* Input area fix */
 .chat-input-area .d-flex {
   gap: 12px;
+  align-items: center;
 }
 
 .chat-input-area textarea {

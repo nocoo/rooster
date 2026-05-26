@@ -30,16 +30,16 @@ export function ChatInput() {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div class="d-flex gap-3 flex-items-end">
+      <div class="d-flex gap-3">
         <textarea
           ref={inputRef}
           class="form-control flex-1"
           placeholder="Send a message…"
-          rows={3}
+          rows={1}
           disabled={isStreaming}
           onKeyDown={handleKeyDown}
           aria-label="Message input"
-          style={{ resize: 'none', borderRadius: '8px' }}
+          style={{ resize: 'none', borderRadius: '8px', maxHeight: '120px', overflow: 'auto' }}
         />
         {isStreaming ? (
           <button
