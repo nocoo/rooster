@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { createDb, getDb, closeDb } from '../src/services/hermes/db.js'
+import Database from 'better-sqlite3'
+import { createDb, getDb, closeDb, migrateSchema } from '../src/services/hermes/db.js'
+import { MessageStore } from '../src/services/hermes/message-store.js'
 
 describe('db', () => {
   afterEach(() => {
@@ -71,6 +73,71 @@ describe('db', () => {
     it('should no-op when no db is open', () => {
       closeDb()
       closeDb()
+    })
+  })
+
+  describe('schema migration — attachments column', () => {
+    it('should add attachments column to existing messages table that lacks it', () => {
+      const db = new Database(':memory:')
+      db.pragma('journal_mode = WAL')
+      db.pragma('foreign_keys = ON')
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sessions (
+          id TEXT PRIMARY KEY,
+          started_at TEXT NOT NULL DEFAULT (datetime('now')),
+          last_active TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS messages (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          role TEXT NOT NULL,
+          content TEXT,
+          tool_call_id TEXT,
+          tool_calls TEXT,
+          tool_name TEXT,
+          timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+          token_count INTEGER,
+          finish_reason TEXT,
+          reasoning TEXT,
+          reasoning_details TEXT,
+          reasoning_content TEXT,
+          FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+        );
+      `)
+      db.prepare("INSERT INTO sessions (id, started_at, last_active) VALUES ('s1', '2025-01-01', '2025-01-01')").run()
+
+      const colsBefore = db.pragma('table_info(messages)') as Array<{ name: string }>
+      expect(colsBefore.some((c) => c.name === 'attachments')).toBe(false)
+
+      migrateSchema(db)
+
+      const colsAfter = db.pragma('table_info(messages)') as Array<{ name: string }>
+      expect(colsAfter.some((c) => c.name === 'attachments')).toBe(true)
+
+      const store = new MessageStore(db)
+      const plain = store.append({ session_id: 's1', role: 'user', content: 'plain text' })
+      expect(plain.attachments).toBeNull()
+
+      const withAtt = store.append({
+        session_id: 's1',
+        role: 'user',
+        content: 'with file',
+        attachments: [{ id: 'a1', original_name: 'f.txt', mime_type: 'text/plain', size: 10 }],
+      })
+      expect(withAtt.attachments).toEqual([{ id: 'a1', original_name: 'f.txt', mime_type: 'text/plain', size: 10 }])
+
+      db.close()
+    })
+
+    it('should be idempotent when column already exists', () => {
+      const db = createDb(':memory:')
+      const cols = db.pragma('table_info(messages)') as Array<{ name: string }>
+      expect(cols.some((c) => c.name === 'attachments')).toBe(true)
+      // Running again should not throw
+      migrateSchema(db)
+      const colsStill = db.pragma('table_info(messages)') as Array<{ name: string }>
+      expect(colsStill.some((c) => c.name === 'attachments')).toBe(true)
+      db.close()
     })
   })
 })

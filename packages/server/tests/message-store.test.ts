@@ -189,6 +189,17 @@ describe('MessageStore', () => {
       const msgs = store.paginate('sess-1')
       expect(msgs[0]?.attachments).toEqual(attachments)
     })
+
+    it('should return null when attachments column has malformed JSON', () => {
+      db.prepare(
+        "INSERT INTO messages (id, session_id, role, content, timestamp, attachments) VALUES (?, ?, ?, ?, ?, ?)",
+      ).run('bad-json', 'sess-1', 'user', 'corrupted', '2025-01-01T00:00:01Z', '{not valid json[')
+      const msgs = store.list('sess-1')
+      const corrupted = msgs.find((m) => m.id === 'bad-json')
+      expect(corrupted).toBeDefined()
+      expect(corrupted?.attachments).toBeNull()
+      expect(corrupted?.content).toBe('corrupted')
+    })
   })
 
   describe('cascade delete', () => {

@@ -93,6 +93,13 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_session_id ON attachments(session_id);
 `
 
+export function migrateSchema(instance: Database.Database): void {
+  const columns = instance.pragma('table_info(messages)') as Array<{ name: string }>
+  if (!columns.some((c) => c.name === 'attachments')) {
+    instance.exec('ALTER TABLE messages ADD COLUMN attachments TEXT')
+  }
+}
+
 let db: Database.Database | null = null
 
 export function getDb(path?: string): Database.Database {
@@ -102,6 +109,7 @@ export function getDb(path?: string): Database.Database {
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   db.exec(SCHEMA_SQL)
+  migrateSchema(db)
   logger.info('Database initialized: %s', dbPath)
   return db
 }
@@ -111,6 +119,7 @@ export function createDb(path: string): Database.Database {
   instance.pragma('journal_mode = WAL')
   instance.pragma('foreign_keys = ON')
   instance.exec(SCHEMA_SQL)
+  migrateSchema(instance)
   return instance
 }
 

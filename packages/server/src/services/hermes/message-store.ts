@@ -66,10 +66,15 @@ export interface PaginateOptions {
 }
 
 function deserialize(row: RawMessage): Message {
-  return {
-    ...row,
-    attachments: row.attachments ? JSON.parse(row.attachments) as AttachmentRef[] : null,
+  let attachments: AttachmentRef[] | null = null
+  if (row.attachments) {
+    try {
+      attachments = JSON.parse(row.attachments) as AttachmentRef[]
+    } catch {
+      attachments = null
+    }
   }
+  return { ...row, attachments }
 }
 
 export class MessageStore {
