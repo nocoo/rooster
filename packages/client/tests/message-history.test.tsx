@@ -1,8 +1,8 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/preact'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, fireEvent, cleanup } from '@testing-library/preact'
 import { MessageHistory } from '../src/components/MessageHistory.js'
 import { messages, loading, activeSessionId, sessions } from '../src/state/sessions.js'
 import { runStates } from '../src/state/chat.js'
@@ -205,5 +205,91 @@ describe('MessageHistory — jump to bottom', () => {
     const btn = container.querySelector('.jump-to-bottom') as HTMLButtonElement
     expect(btn).toBeTruthy()
     expect(btn.getAttribute('aria-label')).toBe('Jump to bottom')
+  })
+})
+
+describe('MessageHistory — ResizeObserver auto-scroll', () => {
+  let resizeCallbacks: Array<() => void>
+  let originalResizeObserver: typeof ResizeObserver
+
+  beforeEach(() => {
+    resizeCallbacks = []
+    originalResizeObserver = globalThis.ResizeObserver
+    globalThis.ResizeObserver = class MockResizeObserver {
+      constructor(cb: () => void) { resizeCallbacks.push(cb) }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver
+
+    sessions.value = [{ id: 's1', title: 'Chat', started_at: '2025-01-01', last_active: '2025-01-01' }]
+    activeSessionId.value = 's1'
+    messages.value = [
+      { id: 'm1', session_id: 's1', role: 'user', content: 'Hello', timestamp: '2025-01-01T12:00:00Z' },
+    ]
+    loading.value = false
+    runStates.value = {}
+  })
+
+  afterEach(() => {
+    cleanup()
+    globalThis.ResizeObserver = originalResizeObserver
+  })
+
+  function getScrollEl(container: Element): HTMLElement {
+    const el = container.querySelector('.chat-messages')
+    expect(el).toBeTruthy()
+    return el as HTMLElement
+  }
+
+  function triggerResize() {
+    for (const cb of resizeCallbacks) cb()
+  }
+
+  it('should scroll to bottom on resize when following', () => {
+    const { container } = render(<MessageHistory />)
+    const scrollEl = getScrollEl(container)
+    mockScrollable(scrollEl, { scrollHeight: 2000, clientHeight: 400, scrollTop: 1600 })
+
+    triggerResize()
+    expect(scrollEl.scrollTop).toBe(1600)
+  })
+
+  it('should not force scroll on resize when not following', () => {
+    const { container } = render(<MessageHistory />)
+    const scrollEl = getScrollEl(container)
+
+    mockScrollable(scrollEl, { scrollHeight: 2000, clientHeight: 400, scrollTop: 100 })
+    fireEvent.scroll(scrollEl)
+
+    mockScrollable(scrollEl, { scrollHeight: 2500, clientHeight: 400, scrollTop: 100 })
+    triggerResize()
+    expect(scrollEl.scrollTop).toBe(100)
+  })
+
+  it('should resume auto-scroll on resize after jump-to-bottom click', () => {
+    const { container } = render(<MessageHistory />)
+    const scrollEl = getScrollEl(container)
+
+    mockScrollable(scrollEl, { scrollHeight: 2000, clientHeight: 400, scrollTop: 100 })
+    fireEvent.scroll(scrollEl)
+
+    const jumpBtn = container.querySelector('.jump-to-bottom') as HTMLButtonElement
+    expect(jumpBtn).toBeTruthy()
+    fireEvent.click(jumpBtn)
+
+    mockScrollable(scrollEl, { scrollHeight: 2500, clientHeight: 400, scrollTop: 1600 })
+    triggerResize()
+    expect(scrollEl.scrollTop).toBe(2100)
+  })
+
+  it('should auto-scroll on resize when tool/reasoning content grows (following=true)', () => {
+    runStates.value = { 's1': { streaming: true, aborting: false, runId: 'r1', output: 'partial', reasoning: 'thinking', reasoningDone: false, tools: [{ tool_call_id: 'tc1', name: 'Bash', arguments: '{}', status: 'started' }], agentEvents: [], approval: null, clarify: null, error: null } }
+    const { container } = render(<MessageHistory />)
+    const scrollEl = getScrollEl(container)
+
+    mockScrollable(scrollEl, { scrollHeight: 3000, clientHeight: 400, scrollTop: 2600 })
+    triggerResize()
+    expect(scrollEl.scrollTop).toBe(2600)
   })
 })

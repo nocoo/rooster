@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'preact/hooks'
 import { useSignal } from '@preact/signals'
 import { messages, loading, activeSession } from '../state/sessions.js'
-import { isStreamingHere, chatError, pendingApproval, pendingClarify, streamOutput } from '../state/chat.js'
+import { isStreamingHere, chatError, pendingApproval, pendingClarify } from '../state/chat.js'
 import { ChatInput } from './ChatInput.js'
 import { StreamingMessage } from './StreamingMessage.js'
 import { ToolTrace } from './ToolTrace.js'
@@ -17,17 +17,27 @@ export function MessageHistory() {
   const session = activeSession.value
   const isLoading = loading.value
   const containerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const following = useSignal(true)
 
   useEffect(() => {
     following.value = true
+    if (containerRef.current) {
+      scrollToBottom(containerRef.current)
+    }
   }, [session?.id])
 
   useEffect(() => {
-    if (following.value && containerRef.current) {
-      scrollToBottom(containerRef.current)
-    }
-  }, [msgs.length, streamOutput.value, isStreamingHere.value])
+    const content = contentRef.current
+    if (!content) return
+    const observer = new ResizeObserver(() => {
+      if (following.value && containerRef.current) {
+        scrollToBottom(containerRef.current)
+      }
+    })
+    observer.observe(content)
+    return () => { observer.disconnect() }
+  }, [session?.id, isLoading])
 
   function handleScroll() {
     const el = containerRef.current
@@ -65,49 +75,51 @@ export function MessageHistory() {
   return (
     <div class="app-chat">
       <div class="chat-messages" ref={containerRef} onScroll={handleScroll}>
-        {msgs.length === 0 && !isStreamingHere.value && (
-          <p class="color-fg-muted f5">No messages in this session</p>
-        )}
-        {msgs.map((msg) => (
-          <div
-            key={msg.id}
-            class={`message-bubble ${msg.role === 'user' ? 'message-bubble--user' : 'message-bubble--assistant'}`}
-          >
-            <div class="message-meta">
-              <span class={`Label Label--small ${msg.role === 'assistant' ? 'Label--secondary' : 'Label--outline'}`}>
-                {msg.role === 'assistant' ? 'Agent' : 'Human'}
-              </span>
-              <span class="color-fg-muted">{new Date(msg.timestamp).toLocaleTimeString()}</span>
+        <div ref={contentRef}>
+          {msgs.length === 0 && !isStreamingHere.value && (
+            <p class="color-fg-muted f5">No messages in this session</p>
+          )}
+          {msgs.map((msg) => (
+            <div
+              key={msg.id}
+              class={`message-bubble ${msg.role === 'user' ? 'message-bubble--user' : 'message-bubble--assistant'}`}
+            >
+              <div class="message-meta">
+                <span class={`Label Label--small ${msg.role === 'assistant' ? 'Label--secondary' : 'Label--outline'}`}>
+                  {msg.role === 'assistant' ? 'Agent' : 'Human'}
+                </span>
+                <span class="color-fg-muted">{new Date(msg.timestamp).toLocaleTimeString()}</span>
+              </div>
+              {msg.role === 'assistant' ? (
+                <>
+                  {msg.reasoning && (
+                    <ReasoningBlock reasoning={msg.reasoning} done={true} />
+                  )}
+                  <Markdown content={msg.content} />
+                </>
+              ) : (
+                <div class="message-content">{msg.content}</div>
+              )}
             </div>
-            {msg.role === 'assistant' ? (
-              <>
-                {msg.reasoning && (
-                  <ReasoningBlock reasoning={msg.reasoning} done={true} />
-                )}
-                <Markdown content={msg.content} />
-              </>
-            ) : (
-              <div class="message-content">{msg.content}</div>
-            )}
-          </div>
-        ))}
-        {isStreamingHere.value && (
-          <>
-            <AgentStatusBar />
-            <ToolTrace />
-            <StreamingMessage />
-          </>
-        )}
-        {pendingApproval.value && <ApprovalDialog />}
-        {pendingClarify.value && <ClarifyDialog />}
-        {chatError.value && (
-          <div class="message-bubble message-bubble--error">
-            <div class="message-meta">
-              <span class="Label Label--small Label--danger">error</span>
+          ))}
+          {isStreamingHere.value && (
+            <>
+              <AgentStatusBar />
+              <ToolTrace />
+              <StreamingMessage />
+            </>
+          )}
+          {pendingApproval.value && <ApprovalDialog />}
+          {pendingClarify.value && <ClarifyDialog />}
+          {chatError.value && (
+            <div class="message-bubble message-bubble--error">
+              <div class="message-meta">
+                <span class="Label Label--small Label--danger">error</span>
+              </div>
+              <div class="message-content">{chatError.value}</div>
             </div>
-            <div class="message-content">{chatError.value}</div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
       {!following.value && (
         <button
