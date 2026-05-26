@@ -4,7 +4,8 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/preact'
 import { StreamingMessage } from '../src/components/StreamingMessage.js'
-import { streamOutput, reasoningText } from '../src/state/chat.js'
+import { runStates } from '../src/state/chat.js'
+import { activeSessionId } from '../src/state/sessions.js'
 
 vi.mock('../src/ws/chat.js', () => ({
   connect: vi.fn(),
@@ -30,8 +31,8 @@ vi.mock('socket.io-client', () => ({
 
 describe('StreamingMessage', () => {
   beforeEach(() => {
-    streamOutput.value = ''
-    reasoningText.value = ''
+    activeSessionId.value = 'test-session'
+    runStates.value = {}
   })
 
   afterEach(() => {
@@ -44,27 +45,26 @@ describe('StreamingMessage', () => {
   })
 
   it('should render output text', () => {
-    streamOutput.value = 'Hello from assistant'
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: 'Hello from assistant', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
     render(<StreamingMessage />)
     expect(screen.getByText('Hello from assistant')).toBeTruthy()
   })
 
   it('should render streaming label', () => {
-    streamOutput.value = 'partial'
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: 'partial', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
     render(<StreamingMessage />)
     expect(screen.getByText('Agent')).toBeTruthy()
   })
 
   it('should render reasoning in details element', () => {
-    streamOutput.value = 'output'
-    reasoningText.value = 'thinking process'
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: 'output', reasoning: 'thinking process', reasoningDone: false, tools: [], agentEvents: [], error: null } }
     render(<StreamingMessage />)
     expect(screen.getByText('Reasoning')).toBeTruthy()
     expect(screen.getByText('thinking process')).toBeTruthy()
   })
 
   it('should render with only reasoning text', () => {
-    reasoningText.value = 'just thinking'
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: 'just thinking', reasoningDone: false, tools: [], agentEvents: [], error: null } }
     render(<StreamingMessage />)
     expect(screen.getByText('just thinking')).toBeTruthy()
   })

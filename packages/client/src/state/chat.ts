@@ -32,19 +32,66 @@ export interface AgentStatus {
   [key: string]: unknown
 }
 
-export const streaming = signal(false)
-export const streamingSessionId = signal<string | null>(null)
-export const aborting = signal(false)
-export const currentRunId = signal<string | null>(null)
-export const streamOutput = signal('')
-export const reasoningText = signal('')
-export const reasoningDone = signal(false)
-export const toolEvents = signal<ToolEvent[]>([])
-export const agentEvents = signal<AgentStatus[]>([])
-export const chatError = signal<string | null>(null)
+export interface RunState {
+  streaming: boolean
+  aborting: boolean
+  runId: string | null
+  output: string
+  reasoning: string
+  reasoningDone: boolean
+  tools: ToolEvent[]
+  agentEvents: AgentStatus[]
+  error: string | null
+}
+
+function createRunState(): RunState {
+  return {
+    streaming: false,
+    aborting: false,
+    runId: null,
+    output: '',
+    reasoning: '',
+    reasoningDone: false,
+    tools: [],
+    agentEvents: [],
+    error: null,
+  }
+}
+
+export const runStates = signal<Record<string, RunState>>({})
+
+function getState(sessionId: string): RunState {
+  return runStates.value[sessionId] ?? createRunState()
+}
+
+function setState(sessionId: string, patch: Partial<RunState>): void {
+  const current = getState(sessionId)
+  runStates.value = { ...runStates.value, [sessionId]: { ...current, ...patch } }
+}
+
+function clearState(sessionId: string): void {
+  const entries = Object.entries(runStates.value).filter(([key]) => key !== sessionId)
+  runStates.value = Object.fromEntries(entries)
+}
+
+export const activeRunState = computed<RunState>(() => {
+  const sid = activeSessionId.value
+  if (!sid) return createRunState()
+  return getState(sid)
+})
+
+export const streaming = computed(() => activeRunState.value.streaming)
+export const aborting = computed(() => activeRunState.value.aborting)
+export const currentRunId = computed(() => activeRunState.value.runId)
+export const streamOutput = computed(() => activeRunState.value.output)
+export const reasoningText = computed(() => activeRunState.value.reasoning)
+export const reasoningDone = computed(() => activeRunState.value.reasoningDone)
+export const toolEvents = computed(() => activeRunState.value.tools)
+export const agentEvents = computed(() => activeRunState.value.agentEvents)
+export const chatError = computed(() => activeRunState.value.error)
 
 export const isWorking = computed(() => streaming.value || aborting.value)
-export const isStreamingHere = computed(() => streaming.value && streamingSessionId.value === activeSessionId.value)
+export const isStreamingHere = computed(() => streaming.value)
 
 export function initChat(): void {
   setHandlers({
@@ -86,14 +133,16 @@ export function send(input: string, opts?: { model?: string; profile?: string; p
   }
   messages.value = [...messages.value, userMessage]
 
-  streaming.value = true
-  streamingSessionId.value = sessionId
-  chatError.value = null
-  streamOutput.value = ''
-  reasoningText.value = ''
-  reasoningDone.value = false
-  toolEvents.value = []
-  agentEvents.value = []
+  setState(sessionId, {
+    streaming: true,
+    aborting: false,
+    error: null,
+    output: '',
+    reasoning: '',
+    reasoningDone: false,
+    tools: [],
+    agentEvents: [],
+  })
 
   const payload: Record<string, string> = { input, session_id: sessionId }
   if (opts?.model) payload['model'] = opts.model
@@ -104,33 +153,28 @@ export function send(input: string, opts?: { model?: string; profile?: string; p
 }
 
 export function abort(): void {
-  const sessionId = streamingSessionId.value
-  if (!sessionId || !streaming.value) return
-  aborting.value = true
+  const sessionId = activeSessionId.value
+  if (!sessionId) return
+  const state = getState(sessionId)
+  if (!state.streaming) return
+  setState(sessionId, { aborting: true })
   sendAbort(sessionId)
-}
-
-function isActiveSession(sessionId: string): boolean {
-  return sessionId === activeSessionId.value
 }
 
 function handleRunStarted(payload: RunStartedPayload): void {
   pushDebugEvent('run.started', payload)
-  if (!isActiveSession(payload.session_id)) return
-  currentRunId.value = payload.run_id
+  setState(payload.session_id, { runId: payload.run_id })
 }
 
 function handleMessageDelta(payload: MessageDeltaPayload): void {
   pushDebugEvent('message.delta', payload)
-  if (!isActiveSession(payload.session_id)) return
-  streamOutput.value = payload.output
+  setState(payload.session_id, { output: payload.output })
 }
 
 function handleRunCompleted(payload: RunCompletedPayload): void {
   pushDebugEvent('run.completed', payload)
-  if (!isActiveSession(payload.session_id)) return
-
-  const finalOutput = payload.output || streamOutput.value
+  const state = getState(payload.session_id)
+  const finalOutput = payload.output || state.output
 
   const assistantMessage: Message = {
     id: crypto.randomUUID(),
@@ -139,47 +183,39 @@ function handleRunCompleted(payload: RunCompletedPayload): void {
     content: finalOutput,
     timestamp: new Date().toISOString(),
   }
-  messages.value = [...messages.value, assistantMessage]
 
-  streaming.value = false
-  aborting.value = false
-  currentRunId.value = null
-  streamingSessionId.value = null
-  streamOutput.value = ''
-  reasoningText.value = ''
-  reasoningDone.value = false
-  toolEvents.value = []
-  agentEvents.value = []
+  if (payload.session_id === activeSessionId.value) {
+    messages.value = [...messages.value, assistantMessage]
+  }
 
+  clearState(payload.session_id)
   void loadSessions()
 }
 
 function handleRunFailed(payload: RunFailedPayload): void {
   pushDebugEvent('run.failed', payload)
-  if (!isActiveSession(payload.session_id)) return
-  chatError.value = payload.error
+  const state = getState(payload.session_id)
 
-  if (streamOutput.value) {
+  if (state.output && payload.session_id === activeSessionId.value) {
     const partialMessage: Message = {
       id: crypto.randomUUID(),
       session_id: payload.session_id,
       role: 'assistant',
-      content: streamOutput.value,
+      content: state.output,
       timestamp: new Date().toISOString(),
     }
     messages.value = [...messages.value, partialMessage]
   }
 
-  streaming.value = false
-  aborting.value = false
-  currentRunId.value = null
-  streamingSessionId.value = null
-  streamOutput.value = ''
+  clearState(payload.session_id)
+  if (payload.session_id === activeSessionId.value) {
+    setState(payload.session_id, { error: payload.error })
+  }
 }
 
 function handleToolStarted(payload: ToolStartedPayload): void {
   pushDebugEvent('tool.started', payload)
-  if (!isActiveSession(payload.session_id)) return
+  const state = getState(payload.session_id)
   const evt: ToolEvent = {
     tool_call_id: payload.tool_call_id,
     name: payload.name,
@@ -187,13 +223,13 @@ function handleToolStarted(payload: ToolStartedPayload): void {
     ...(payload.arguments ? { arguments: payload.arguments } : {}),
     ...(payload.preview ? { preview: payload.preview } : {}),
   }
-  toolEvents.value = [...toolEvents.value, evt]
+  setState(payload.session_id, { tools: [...state.tools, evt] })
 }
 
 function handleToolCompleted(payload: ToolCompletedPayload): void {
   pushDebugEvent('tool.completed', payload)
-  if (!isActiveSession(payload.session_id)) return
-  toolEvents.value = toolEvents.value.map((t) =>
+  const state = getState(payload.session_id)
+  const tools = state.tools.map((t) =>
     t.tool_call_id === payload.tool_call_id
       ? {
           ...t,
@@ -204,38 +240,34 @@ function handleToolCompleted(payload: ToolCompletedPayload): void {
         }
       : t,
   )
+  setState(payload.session_id, { tools })
 }
 
 function handleAbortCompleted(payload: AbortCompletedPayload): void {
   pushDebugEvent('abort.completed', payload)
-  if (!isActiveSession(payload.session_id)) return
-  streaming.value = false
-  aborting.value = false
-  currentRunId.value = null
-  streamingSessionId.value = null
+  clearState(payload.session_id)
 }
 
 function handleReasoningDelta(payload: ReasoningDeltaPayload): void {
   pushDebugEvent('reasoning.delta', payload)
-  if (!isActiveSession(payload.session_id)) return
-  reasoningText.value += payload.text
+  const state = getState(payload.session_id)
+  setState(payload.session_id, { reasoning: state.reasoning + payload.text })
 }
 
 function handleThinkingDelta(payload: ThinkingDeltaPayload): void {
   pushDebugEvent('thinking.delta', payload)
-  if (!isActiveSession(payload.session_id)) return
-  reasoningText.value += payload.text
+  const state = getState(payload.session_id)
+  setState(payload.session_id, { reasoning: state.reasoning + payload.text })
 }
 
 function handleReasoningAvailable(payload: ReasoningAvailablePayload): void {
   pushDebugEvent('reasoning.available', payload)
-  if (!isActiveSession(payload.session_id)) return
-  reasoningDone.value = true
+  setState(payload.session_id, { reasoningDone: true })
 }
 
 function handleAgentEvent(payload: AgentEventPayload): void {
   pushDebugEvent('agent.event', payload)
-  if (!isActiveSession(payload.session_id)) return
+  const state = getState(payload.session_id)
   const profile = payload['profile']
   const model = payload['model']
   const provider = payload['provider']
@@ -247,17 +279,19 @@ function handleAgentEvent(payload: AgentEventPayload): void {
     ...(typeof provider === 'string' ? { provider } : {}),
     ...(typeof toolCount === 'number' ? { tool_count: toolCount } : {}),
   }
-  agentEvents.value = [...agentEvents.value, status]
+  setState(payload.session_id, { agentEvents: [...state.agentEvents, status] })
 }
 
 function handleResumed(payload: ResumedPayload): void {
   pushDebugEvent('resumed', payload)
-  if (!isActiveSession(payload.session_id)) return
+  if (payload.session_id !== activeSessionId.value) return
 
   if (Array.isArray(payload.messages) && payload.messages.length > 0) {
     messages.value = payload.messages as Message[]
   }
 
-  streaming.value = payload.isWorking
-  aborting.value = payload.isAborting
+  setState(payload.session_id, {
+    streaming: payload.isWorking,
+    aborting: payload.isAborting,
+  })
 }

@@ -4,7 +4,8 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/preact'
 import { AgentStatusBar } from '../src/components/AgentStatusBar.js'
-import { agentEvents } from '../src/state/chat.js'
+import { runStates } from '../src/state/chat.js'
+import { activeSessionId } from '../src/state/sessions.js'
 
 vi.mock('../src/ws/chat.js', () => ({
   connect: vi.fn(),
@@ -30,7 +31,8 @@ vi.mock('socket.io-client', () => ({
 
 describe('AgentStatusBar', () => {
   beforeEach(() => {
-    agentEvents.value = []
+    activeSessionId.value = 'test-session'
+    runStates.value = {}
   })
 
   afterEach(() => {
@@ -43,13 +45,13 @@ describe('AgentStatusBar', () => {
   })
 
   it('should render agent status with all fields', () => {
-    agentEvents.value = [{
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [{
       type: 'status',
       profile: 'coding',
       model: 'claude-4',
       provider: 'anthropic',
       tool_count: 30,
-    }]
+    }], error: null } }
     render(<AgentStatusBar />)
     expect(screen.getByText('status')).toBeTruthy()
     expect(screen.getByText(/profile: coding/)).toBeTruthy()
@@ -59,16 +61,16 @@ describe('AgentStatusBar', () => {
   })
 
   it('should render minimal event with only type', () => {
-    agentEvents.value = [{ type: 'custom_event' }]
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [{ type: 'custom_event' }], error: null } }
     render(<AgentStatusBar />)
     expect(screen.getAllByText('custom_event').length).toBeGreaterThanOrEqual(1)
   })
 
   it('should render multiple events', () => {
-    agentEvents.value = [
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [
       { type: 'init', profile: 'default' },
       { type: 'progress', model: 'gpt-4' },
-    ]
+    ], error: null } }
     render(<AgentStatusBar />)
     expect(screen.getByText('init')).toBeTruthy()
     expect(screen.getByText('progress')).toBeTruthy()

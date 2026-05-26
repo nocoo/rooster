@@ -35,8 +35,9 @@ vi.mock('socket.io-client', () => ({
 }))
 
 import { ChatInput } from '../src/components/ChatInput.js'
-import { streaming, aborting } from '../src/state/chat.js'
+import { runStates } from '../src/state/chat.js'
 import { selectedModel, selectedProfile } from '../src/state/settings.js'
+import { activeSessionId } from '../src/state/sessions.js'
 import * as chatModule from '../src/state/chat.js'
 
 describe('ChatInput', () => {
@@ -44,8 +45,8 @@ describe('ChatInput', () => {
   let mockAbort: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
-    streaming.value = false
-    aborting.value = false
+    activeSessionId.value = 'test-session'
+    runStates.value = {}
     selectedModel.value = null
     selectedProfile.value = null
     mockSend = vi.spyOn(chatModule, 'send').mockImplementation(() => {})
@@ -104,28 +105,27 @@ describe('ChatInput', () => {
   })
 
   it('should show Stop button when streaming', () => {
-    streaming.value = true
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
     render(<ChatInput />)
     expect(screen.getByText('Stop')).toBeTruthy()
   })
 
   it('should call abort on Stop click', () => {
-    streaming.value = true
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
     render(<ChatInput />)
     fireEvent.click(screen.getByText('Stop'))
     expect(mockAbort).toHaveBeenCalled()
   })
 
   it('should disable Stop button when aborting', () => {
-    streaming.value = true
-    aborting.value = true
+    runStates.value = { 'test-session': { streaming: true, aborting: true, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
     render(<ChatInput />)
     const btn = screen.getByText('Stopping…')
     expect((btn as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('should disable textarea when streaming', () => {
-    streaming.value = true
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], error: null } }
     render(<ChatInput />)
     const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
     expect(textarea.disabled).toBe(true)
