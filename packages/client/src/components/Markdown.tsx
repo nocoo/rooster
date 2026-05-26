@@ -8,6 +8,13 @@ export function Markdown({ content }: { content: string }) {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    const timers: Array<ReturnType<typeof setTimeout>> = []
+
+    function showFeedback(btn: HTMLElement, text: string) {
+      btn.textContent = text
+      const timer = setTimeout(() => { btn.textContent = 'Copy' }, 1500)
+      timers.push(timer)
+    }
 
     function handleClick(e: Event) {
       const target = e.target as HTMLElement
@@ -15,20 +22,25 @@ export function Markdown({ content }: { content: string }) {
       const wrapper = target.closest('.code-block-wrapper')
       const code = wrapper?.querySelector('code')
       if (!code) return
-      navigator.clipboard.writeText(code.textContent || '').then(
-        () => {
-          target.textContent = 'Copied!'
-          setTimeout(() => { target.textContent = 'Copy' }, 1500)
-        },
-        () => {
-          target.textContent = 'Failed'
-          setTimeout(() => { target.textContent = 'Copy' }, 1500)
-        },
+      const text = code.textContent || ''
+      let writePromise: Promise<void>
+      try {
+        writePromise = navigator.clipboard.writeText(text)
+      } catch {
+        showFeedback(target, 'Failed')
+        return
+      }
+      writePromise.then(
+        () => { showFeedback(target, 'Copied!') },
+        () => { showFeedback(target, 'Failed') },
       )
     }
 
     el.addEventListener('click', handleClick)
-    return () => { el.removeEventListener('click', handleClick) }
+    return () => {
+      el.removeEventListener('click', handleClick)
+      for (const t of timers) clearTimeout(t)
+    }
   }, [content])
 
   return <div ref={containerRef} class="message-content markdown-body" dangerouslySetInnerHTML={{ __html: html }} />

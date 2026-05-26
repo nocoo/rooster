@@ -120,4 +120,28 @@ describe('Markdown — copy button', () => {
       expect(writeTextMock).toHaveBeenCalledWith('')
     })
   })
+
+  it('should show Failed when navigator.clipboard is unavailable', () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    })
+    const { container } = render(<Markdown content={'```\ncode\n```'} />)
+    const copyBtn = container.querySelector('.code-block-copy') as HTMLButtonElement
+    fireEvent.click(copyBtn)
+    expect(copyBtn.textContent).toBe('Failed')
+  })
+
+  it('should show Failed when clipboard.writeText is not a function', () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: 'not-a-function' },
+      writable: true,
+      configurable: true,
+    })
+    const { container } = render(<Markdown content={'```\ncode\n```'} />)
+    const copyBtn = container.querySelector('.code-block-copy') as HTMLButtonElement
+    fireEvent.click(copyBtn)
+    expect(copyBtn.textContent).toBe('Failed')
+  })
 })
