@@ -70,4 +70,18 @@ describe('state/health', () => {
     await vi.advanceTimersByTimeAsync(30_000)
     expect(mockFetchHealth).toHaveBeenCalledTimes(1)
   })
+
+  it('should allow restart after stop', async () => {
+    mockFetchHealth.mockResolvedValue({ status: 'ok', timestamp: '', bridge: 'connected' })
+    startHealthPolling()
+    await vi.advanceTimersByTimeAsync(0)
+    stopHealthPolling()
+
+    startHealthPolling()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockFetchHealth).toHaveBeenCalledTimes(2)
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(mockFetchHealth).toHaveBeenCalledTimes(3)
+  })
 })

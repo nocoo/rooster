@@ -10,7 +10,7 @@ import { BridgeStatus } from '../components/BridgeStatus.js'
 import { loadSessions, setActiveSession, activeSessionId } from '../state/sessions.js'
 import { initChat } from '../state/chat.js'
 import { loadSettings } from '../state/settings.js'
-import { startHealthPolling } from '../state/health.js'
+import { startHealthPolling, stopHealthPolling } from '../state/health.js'
 import { debugEnabled, toggleDebug } from '../state/debug.js'
 
 function getInitialColorMode(): 'light' | 'dark' {
@@ -68,6 +68,7 @@ export function App({ url }: { url?: string }) {
     void loadSessions()
     void loadSettings()
     startHealthPolling()
+    return () => { stopHealthPolling() }
   }, [])
 
   return (
