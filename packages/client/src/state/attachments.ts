@@ -23,7 +23,7 @@ export const hasUploading = computed(() =>
 
 let nextLocalId = 0
 
-export function addFiles(files: FileList): void {
+export function addFiles(files: FileList, sessionId?: string): void {
   for (const file of Array.from(files)) {
     const localId = `local-${String(++nextLocalId)}`
     const entry: PendingAttachment = {
@@ -34,13 +34,13 @@ export function addFiles(files: FileList): void {
       status: 'uploading',
     }
     pendingAttachments.value = [...pendingAttachments.value, entry]
-    void doUpload(localId, file)
+    void doUpload(localId, file, sessionId)
   }
 }
 
-async function doUpload(localId: string, file: File): Promise<void> {
+async function doUpload(localId: string, file: File, sessionId?: string): Promise<void> {
   try {
-    const result: UploadResult = await uploadFile(file)
+    const result: UploadResult = await uploadFile(file, sessionId)
     updateEntry(localId, { status: 'ready', serverId: result.id })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Upload failed'

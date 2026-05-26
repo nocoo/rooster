@@ -2,6 +2,7 @@ import { useRef } from 'preact/hooks'
 import { isStreamingHere, aborting, anySessionWorking, send, abort } from '../state/chat.js'
 import { selectedModel, selectedProfile, selectedProvider } from '../state/settings.js'
 import { pendingAttachments, readyAttachments, hasUploading, addFiles, removeAttachment, clearAttachments } from '../state/attachments.js'
+import { activeSessionId } from '../state/sessions.js'
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${String(bytes)} B`
@@ -15,6 +16,7 @@ export function ChatInput() {
 
   function handleSubmit(e: Event) {
     e.preventDefault()
+    if (anySessionWorking.value || hasUploading.value) return
     const el = inputRef.current
     if (!el) return
     const text = el.value.trim()
@@ -53,7 +55,7 @@ export function ChatInput() {
   function handleFileChange(e: Event) {
     const input = e.target as HTMLInputElement
     if (input.files && input.files.length > 0) {
-      addFiles(input.files)
+      addFiles(input.files, activeSessionId.value ?? undefined)
       input.value = ''
     }
   }

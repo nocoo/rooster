@@ -125,6 +125,44 @@ describe('ChatInput — attachments', () => {
     expect((sendBtn as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('should not send via Enter while upload is in progress', () => {
+    pendingAttachments.value = [
+      { localId: 'l1', original_name: 'big.pdf', mime_type: 'application/pdf', size: 999, status: 'uploading' },
+    ]
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'test'
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
+    expect(mockSend).not.toHaveBeenCalled()
+    expect(pendingAttachments.value).toHaveLength(1)
+  })
+
+  it('should not send via form submit while upload is in progress', () => {
+    pendingAttachments.value = [
+      { localId: 'l1', original_name: 'big.pdf', mime_type: 'application/pdf', size: 999, status: 'uploading' },
+    ]
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'test'
+    fireEvent.submit(textarea.closest('form') as HTMLFormElement)
+    expect(mockSend).not.toHaveBeenCalled()
+    expect(pendingAttachments.value).toHaveLength(1)
+    expect(textarea.value).toBe('test')
+  })
+
+  it('should pass activeSessionId to uploadFile', async () => {
+    activeSessionId.value = 'sess-42'
+    mockUploadFile.mockResolvedValue({ id: 'srv-x', original_name: 'f.txt', mime_type: 'text/plain', size: 1 })
+    render(<ChatInput />)
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(['hi'], 'f.txt', { type: 'text/plain' })
+    Object.defineProperty(fileInput, 'files', { value: [file], configurable: true })
+    fireEvent.change(fileInput)
+    await vi.waitFor(() => {
+      expect(mockUploadFile).toHaveBeenCalledWith(expect.any(File), 'sess-42')
+    })
+  })
+
   it('should call addFiles on file input change', async () => {
     mockUploadFile.mockResolvedValue({ id: 'srv-1', original_name: 'x.txt', mime_type: 'text/plain', size: 3 })
     render(<ChatInput />)
