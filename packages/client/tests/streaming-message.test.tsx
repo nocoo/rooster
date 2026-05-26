@@ -52,7 +52,7 @@ describe('StreamingMessage', () => {
   it('should render streaming label', () => {
     streamOutput.value = 'partial'
     render(<StreamingMessage />)
-    expect(screen.getByText('assistant')).toBeTruthy()
+    expect(screen.getByText('Agent')).toBeTruthy()
   })
 
   it('should render reasoning in details element', () => {

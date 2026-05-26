@@ -43,7 +43,7 @@ export function MessageHistory() {
           >
             <div class="message-meta">
               <span class={`Label Label--small ${msg.role === 'assistant' ? 'Label--secondary' : 'Label--outline'}`}>
-                {msg.role}
+                {msg.role === 'assistant' ? 'Agent' : 'Human'}
               </span>
               <span class="color-fg-muted">{new Date(msg.timestamp).toLocaleTimeString()}</span>
             </div>
