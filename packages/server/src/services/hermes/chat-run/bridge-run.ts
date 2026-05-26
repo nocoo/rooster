@@ -207,6 +207,44 @@ function emitBridgeEvent(
       session_id: sessionId,
       run_id: runId,
     })
+  } else if (type === 'approval.requested') {
+    const choices = Array.isArray(evt['choices']) ? evt['choices'] as string[] : ['allow', 'deny']
+    emitter.emit('approval.requested', {
+      event: 'approval.requested',
+      session_id: sessionId,
+      run_id: runId,
+      approval_id: str(evt['approval_id']),
+      command: str(evt['command']),
+      description: str(evt['description']) || undefined,
+      choices,
+      allow_permanent: evt['allow_permanent'] === true ? true : undefined,
+      timeout_ms: typeof evt['timeout_ms'] === 'number' ? evt['timeout_ms'] : undefined,
+    })
+  } else if (type === 'approval.resolved') {
+    emitter.emit('approval.resolved', {
+      event: 'approval.resolved',
+      session_id: sessionId,
+      run_id: runId,
+      approval_id: str(evt['approval_id']),
+      choice: str(evt['choice']),
+    })
+  } else if (type === 'clarify.requested') {
+    emitter.emit('clarify.requested', {
+      event: 'clarify.requested',
+      session_id: sessionId,
+      run_id: runId,
+      clarify_id: str(evt['clarify_id']),
+      question: str(evt['question']),
+      choices: Array.isArray(evt['choices']) ? evt['choices'] as string[] : undefined,
+      timeout_ms: typeof evt['timeout_ms'] === 'number' ? evt['timeout_ms'] : undefined,
+    })
+  } else if (type === 'clarify.resolved') {
+    emitter.emit('clarify.resolved', {
+      event: 'clarify.resolved',
+      session_id: sessionId,
+      run_id: runId,
+      clarify_id: str(evt['clarify_id']),
+    })
   } else {
     emitter.emit('agent.event', { ...evt, event: 'agent.event', type, session_id: sessionId, run_id: runId })
   }

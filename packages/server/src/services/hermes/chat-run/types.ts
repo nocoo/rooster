@@ -119,6 +119,55 @@ export interface ResumedEvent {
   queueMessages?: unknown[]
 }
 
+export interface ApprovalRequestedEvent {
+  event: 'approval.requested'
+  session_id: string
+  run_id: string
+  approval_id: string
+  command: string
+  description?: string
+  choices: string[]
+  allow_permanent?: boolean
+  timeout_ms?: number
+}
+
+export interface ApprovalResolvedEvent {
+  event: 'approval.resolved'
+  session_id: string
+  run_id?: string
+  approval_id: string
+  choice: string
+}
+
+export interface ClarifyRequestedEvent {
+  event: 'clarify.requested'
+  session_id: string
+  run_id: string
+  clarify_id: string
+  question: string
+  choices?: string[]
+  timeout_ms?: number
+}
+
+export interface ClarifyResolvedEvent {
+  event: 'clarify.resolved'
+  session_id: string
+  run_id?: string
+  clarify_id: string
+}
+
+export interface ApprovalRespondPayload {
+  session_id: string
+  approval_id: string
+  choice: string
+}
+
+export interface ClarifyRespondPayload {
+  session_id: string
+  clarify_id: string
+  response: string
+}
+
 export type ChatRunServerEvent =
   | RunStartedEvent
   | RunCompletedEvent
@@ -130,3 +179,7 @@ export type ChatRunServerEvent =
   | AbortStartedEvent
   | AbortCompletedEvent
   | ResumedEvent
+  | ApprovalRequestedEvent
+  | ApprovalResolvedEvent
+  | ClarifyRequestedEvent
+  | ClarifyResolvedEvent

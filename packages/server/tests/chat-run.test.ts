@@ -53,6 +53,8 @@ function createMockBridge(options: {
     interrupt: () => {
       return Promise.resolve({ ok: true, ...options.interruptResponse } satisfies AgentBridgeResponse)
     },
+    approvalRespond: () => Promise.resolve({ ok: true } satisfies AgentBridgeResponse),
+    clarifyRespond: () => Promise.resolve({ ok: true } satisfies AgentBridgeResponse),
     ping: () => Promise.resolve({ ok: true } satisfies AgentBridgeResponse),
   } as unknown as AgentBridgeClient
 }
@@ -1237,6 +1239,442 @@ describe('Socket.IO /chat-run', () => {
       expect(chatCalls).toHaveLength(1)
       const opts = chatCalls[0]?.options as Record<string, unknown> | undefined
       expect(opts?.['conversation_history']).toBeUndefined()
+    })
+  })
+
+  describe('approval/clarify — event forwarding', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 2,
+            events: [
+              {
+                event: 'approval.requested',
+                approval_id: 'apr-1',
+                command: 'rm -rf /',
+                description: 'Delete everything',
+                choices: ['allow', 'deny'],
+                allow_permanent: true,
+                timeout_ms: 30000,
+              },
+            ],
+            done: false,
+          },
+          {
+            delta: '',
+            output: '',
+            cursor: 2,
+            event_cursor: 3,
+            events: [
+              { event: 'approval.resolved', approval_id: 'apr-1', choice: 'deny' },
+            ],
+            done: false,
+          },
+          {
+            delta: 'OK',
+            output: 'OK',
+            cursor: 3,
+            event_cursor: 3,
+            events: [],
+            done: true,
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should emit approval.requested with correct fields', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('approval.requested', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'do it', session_id: 'sess-apr' })
+        })
+      })
+
+      expect(events).toHaveLength(1)
+      expect(events[0]?.['event']).toBe('approval.requested')
+      expect(events[0]?.['approval_id']).toBe('apr-1')
+      expect(events[0]?.['command']).toBe('rm -rf /')
+      expect(events[0]?.['description']).toBe('Delete everything')
+      expect(events[0]?.['choices']).toEqual(['allow', 'deny'])
+      expect(events[0]?.['allow_permanent']).toBe(true)
+      expect(events[0]?.['timeout_ms']).toBe(30000)
+      expect(events[0]?.['session_id']).toBe('sess-apr')
+      expect(events[0]?.['run_id']).toBe('run-1')
+    })
+
+    it('should emit approval.resolved with correct fields', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('approval.resolved', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'do it', session_id: 'sess-apr2' })
+        })
+      })
+
+      expect(events).toHaveLength(1)
+      expect(events[0]?.['event']).toBe('approval.resolved')
+      expect(events[0]?.['approval_id']).toBe('apr-1')
+      expect(events[0]?.['choice']).toBe('deny')
+    })
+
+    it('should default choices to [allow, deny] when not an array', async () => {
+      client.disconnect()
+      await ioServer.close()
+      await new Promise<void>((resolve) => { httpServer.close(() => { resolve() }) })
+
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'approval.requested', approval_id: 'apr-no-choices', command: 'ls' }],
+            done: false,
+          },
+          { delta: 'ok', output: 'ok', cursor: 2, event_cursor: 1, events: [], done: true },
+        ],
+      }))
+      connectClient()
+
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('approval.requested', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'test', session_id: 'sess-no-choices' })
+        })
+      })
+
+      expect(events[0]?.['choices']).toEqual(['allow', 'deny'])
+    })
+  })
+
+  describe('approval/clarify — clarify event forwarding', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 2,
+            events: [
+              {
+                event: 'clarify.requested',
+                clarify_id: 'clr-1',
+                question: 'Which file?',
+                choices: ['a.ts', 'b.ts'],
+                timeout_ms: 60000,
+              },
+            ],
+            done: false,
+          },
+          {
+            delta: '',
+            output: '',
+            cursor: 2,
+            event_cursor: 3,
+            events: [
+              { event: 'clarify.resolved', clarify_id: 'clr-1' },
+            ],
+            done: false,
+          },
+          {
+            delta: 'Done',
+            output: 'Done',
+            cursor: 3,
+            event_cursor: 3,
+            events: [],
+            done: true,
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should emit clarify.requested with correct fields', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('clarify.requested', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'help', session_id: 'sess-clr' })
+        })
+      })
+
+      expect(events).toHaveLength(1)
+      expect(events[0]?.['event']).toBe('clarify.requested')
+      expect(events[0]?.['clarify_id']).toBe('clr-1')
+      expect(events[0]?.['question']).toBe('Which file?')
+      expect(events[0]?.['choices']).toEqual(['a.ts', 'b.ts'])
+      expect(events[0]?.['timeout_ms']).toBe(60000)
+      expect(events[0]?.['session_id']).toBe('sess-clr')
+      expect(events[0]?.['run_id']).toBe('run-1')
+    })
+
+    it('should emit clarify.resolved with correct fields', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('clarify.resolved', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'help', session_id: 'sess-clr2' })
+        })
+      })
+
+      expect(events).toHaveLength(1)
+      expect(events[0]?.['event']).toBe('clarify.resolved')
+      expect(events[0]?.['clarify_id']).toBe('clr-1')
+    })
+
+    it('should emit clarify.requested with undefined choices when not provided', async () => {
+      client.disconnect()
+      await ioServer.close()
+      await new Promise<void>((resolve) => { httpServer.close(() => { resolve() }) })
+
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'clarify.requested', clarify_id: 'clr-no-choices', question: 'What?' }],
+            done: false,
+          },
+          { delta: 'ok', output: 'ok', cursor: 2, event_cursor: 1, events: [], done: true },
+        ],
+      }))
+      connectClient()
+
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('clarify.requested', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'test', session_id: 'sess-clr-no-ch' })
+        })
+      })
+
+      expect(events[0]?.['choices']).toBeUndefined()
+      expect(events[0]?.['timeout_ms']).toBeUndefined()
+    })
+  })
+
+  describe('approval.respond — socket handler', () => {
+    let approvalRespondCalled: Array<{ approvalId: string; choice: string }>
+
+    beforeEach(() => {
+      approvalRespondCalled = []
+      const bridge = createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'approval.requested', approval_id: 'apr-x', command: 'cmd', choices: ['allow', 'deny'] }],
+            done: false,
+          },
+          { delta: 'ok', output: 'ok', cursor: 2, event_cursor: 1, events: [], done: true },
+        ],
+      })
+      const origApprovalRespond = bridge.approvalRespond.bind(bridge)
+      bridge.approvalRespond = (id: string, choice: string) => {
+        approvalRespondCalled.push({ approvalId: id, choice })
+        return origApprovalRespond(id, choice)
+      }
+      setupServer(bridge)
+      connectClient()
+    })
+
+    it('should call bridge.approvalRespond with correct args', async () => {
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('approval.requested', () => {
+            client.emit('approval.respond', { session_id: 'sess-ap-resp', approval_id: 'apr-x', choice: 'allow' })
+          })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'go', session_id: 'sess-ap-resp' })
+        })
+      })
+
+      expect(approvalRespondCalled).toHaveLength(1)
+      expect(approvalRespondCalled[0]).toEqual({ approvalId: 'apr-x', choice: 'allow' })
+    })
+
+    it('should emit run.failed when no active run for session', async () => {
+      const errors: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.failed', (d: Record<string, unknown>) => {
+            errors.push(d)
+            resolve()
+          })
+          client.emit('approval.respond', { session_id: 'non-existent', approval_id: 'apr-z', choice: 'deny' })
+        })
+      })
+
+      expect(errors).toHaveLength(1)
+      expect(errors[0]?.['error']).toBe('No active run for this session')
+    })
+
+    it('should emit run.failed when bridge.approvalRespond throws', async () => {
+      client.disconnect()
+      await ioServer.close()
+      await new Promise<void>((resolve) => { httpServer.close(() => { resolve() }) })
+
+      const bridge = createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'approval.requested', approval_id: 'apr-err', command: 'cmd', choices: ['allow', 'deny'] }],
+            done: false,
+          },
+          { delta: 'ok', output: 'ok', cursor: 2, event_cursor: 1, events: [], done: true },
+        ],
+      })
+      bridge.approvalRespond = () => Promise.reject(new Error('bridge timeout'))
+      setupServer(bridge)
+      connectClient()
+
+      const errors: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('approval.requested', () => {
+            client.emit('approval.respond', { session_id: 'sess-apr-err', approval_id: 'apr-err', choice: 'allow' })
+          })
+          client.on('run.failed', (d: Record<string, unknown>) => {
+            errors.push(d)
+          })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'go', session_id: 'sess-apr-err' })
+        })
+      })
+
+      expect(errors.length).toBeGreaterThanOrEqual(1)
+      expect(errors[0]?.['error']).toBe('bridge timeout')
+    })
+  })
+
+  describe('clarify.respond — socket handler', () => {
+    let clarifyRespondCalled: Array<{ clarifyId: string; response: string }>
+
+    beforeEach(() => {
+      clarifyRespondCalled = []
+      const bridge = createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'clarify.requested', clarify_id: 'clr-x', question: 'Which?', choices: ['a', 'b'] }],
+            done: false,
+          },
+          { delta: 'ok', output: 'ok', cursor: 2, event_cursor: 1, events: [], done: true },
+        ],
+      })
+      const origClarifyRespond = bridge.clarifyRespond.bind(bridge)
+      bridge.clarifyRespond = (id: string, response: string) => {
+        clarifyRespondCalled.push({ clarifyId: id, response })
+        return origClarifyRespond(id, response)
+      }
+      setupServer(bridge)
+      connectClient()
+    })
+
+    it('should call bridge.clarifyRespond with correct args', async () => {
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('clarify.requested', () => {
+            client.emit('clarify.respond', { session_id: 'sess-cl-resp', clarify_id: 'clr-x', response: 'a' })
+          })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'go', session_id: 'sess-cl-resp' })
+        })
+      })
+
+      expect(clarifyRespondCalled).toHaveLength(1)
+      expect(clarifyRespondCalled[0]).toEqual({ clarifyId: 'clr-x', response: 'a' })
+    })
+
+    it('should emit run.failed when no active run for session', async () => {
+      const errors: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.failed', (d: Record<string, unknown>) => {
+            errors.push(d)
+            resolve()
+          })
+          client.emit('clarify.respond', { session_id: 'non-existent', clarify_id: 'clr-z', response: 'x' })
+        })
+      })
+
+      expect(errors).toHaveLength(1)
+      expect(errors[0]?.['error']).toBe('No active run for this session')
+    })
+
+    it('should emit run.failed when bridge.clarifyRespond throws', async () => {
+      client.disconnect()
+      await ioServer.close()
+      await new Promise<void>((resolve) => { httpServer.close(() => { resolve() }) })
+
+      const bridge = createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'clarify.requested', clarify_id: 'clr-err', question: 'Which?', choices: ['a', 'b'] }],
+            done: false,
+          },
+          { delta: 'ok', output: 'ok', cursor: 2, event_cursor: 1, events: [], done: true },
+        ],
+      })
+      bridge.clarifyRespond = () => Promise.reject(new Error('bridge unavailable'))
+      setupServer(bridge)
+      connectClient()
+
+      const errors: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('clarify.requested', () => {
+            client.emit('clarify.respond', { session_id: 'sess-clr-err', clarify_id: 'clr-err', response: 'a' })
+          })
+          client.on('run.failed', (d: Record<string, unknown>) => {
+            errors.push(d)
+          })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'go', session_id: 'sess-clr-err' })
+        })
+      })
+
+      expect(errors.length).toBeGreaterThanOrEqual(1)
+      expect(errors[0]?.['error']).toBe('bridge unavailable')
     })
   })
 })
