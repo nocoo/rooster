@@ -33,9 +33,28 @@ vi.mock('socket.io-client', () => ({
   io: vi.fn(() => ({ on: vi.fn(), emit: vi.fn(), disconnect: vi.fn() })),
 }))
 
+function ensureLocalStorage(): Storage {
+  if (typeof globalThis.localStorage === 'undefined') {
+    let store = new Map<string, string>()
+    const mock: Storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => { store.set(key, value) },
+      removeItem: (key: string) => { store.delete(key) },
+      clear: () => { store = new Map() },
+      get length() { return store.size },
+      key: (i: number) => [...store.keys()][i] ?? null,
+    }
+    Object.defineProperty(globalThis, 'localStorage', { value: mock, writable: true })
+  }
+  return globalThis.localStorage
+}
+
 describe('Theme toggle', () => {
+  let storage: Storage
+
   beforeEach(() => {
-    localStorage.clear()
+    storage = ensureLocalStorage()
+    storage.clear()
   })
 
   afterEach(() => {
@@ -47,14 +66,12 @@ describe('Theme toggle', () => {
     expect(colorMode.value).toBe('light')
   })
 
-  it('should toggle to dark mode on click', async () => {
-    const { App, colorMode, toggleColorMode } = await import('../src/pages/App.js')
+  it('should toggle to dark mode', async () => {
+    const { colorMode, toggleColorMode } = await import('../src/pages/App.js')
     colorMode.value = 'light'
-    render(<App url="/" />)
-
     toggleColorMode()
     expect(colorMode.value).toBe('dark')
-    expect(localStorage.getItem('color-mode')).toBe('dark')
+    expect(storage.getItem('color-mode')).toBe('dark')
   })
 
   it('should toggle back to light mode', async () => {
@@ -62,7 +79,7 @@ describe('Theme toggle', () => {
     colorMode.value = 'dark'
     toggleColorMode()
     expect(colorMode.value).toBe('light')
-    expect(localStorage.getItem('color-mode')).toBe('light')
+    expect(storage.getItem('color-mode')).toBe('light')
   })
 
   it('should render toggle button in header', async () => {
@@ -73,12 +90,10 @@ describe('Theme toggle', () => {
     expect(btn).toBeTruthy()
   })
 
-  it('should initialize dark from localStorage', async () => {
-    localStorage.setItem('color-mode', 'dark')
+  it('should read persisted dark mode from localStorage on init', async () => {
+    storage.setItem('color-mode', 'dark')
     vi.resetModules()
-    const { colorMode, toggleColorMode } = await import('../src/pages/App.js')
-    colorMode.value = 'light'
-    toggleColorMode()
+    const { colorMode } = await import('../src/pages/App.js')
     expect(colorMode.value).toBe('dark')
   })
 })
