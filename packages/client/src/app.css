@@ -161,9 +161,53 @@ html, body, #app {
   border-radius: 6px;
   padding: 12px;
   overflow-x: auto;
+  white-space: pre;
   margin: 8px 0;
   font-size: 13px;
   line-height: 1.45;
+}
+
+.code-block-wrapper {
+  position: relative;
+  margin: 8px 0;
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  border-radius: 0 0 6px 6px;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
+  border-radius: 6px 6px 0 0;
+  border-bottom: 1px solid var(--borderColor-default, var(--color-border-default));
+  min-height: 28px;
+}
+
+.code-block-lang {
+  font-size: 12px;
+  color: var(--fgColor-muted, var(--color-fg-muted));
+  font-family: inherit;
+}
+
+.code-block-copy {
+  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid var(--borderColor-default, var(--color-border-default));
+  border-radius: 4px;
+  background: var(--bgColor-default, var(--color-canvas-default));
+  color: var(--fgColor-muted, var(--color-fg-muted));
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.code-block-copy:hover {
+  color: var(--fgColor-default, var(--color-fg-default));
+  border-color: var(--fgColor-muted, var(--color-fg-muted));
 }
 
 .markdown-body code {
