@@ -1,6 +1,6 @@
 import { useRef } from 'preact/hooks'
 import { isStreamingHere, aborting, send, abort } from '../state/chat.js'
-import { selectedModel, selectedProfile } from '../state/settings.js'
+import { selectedModel, selectedProfile, selectedProvider } from '../state/settings.js'
 
 export function ChatInput() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -11,9 +11,10 @@ export function ChatInput() {
     if (!el) return
     const text = el.value.trim()
     if (!text) return
-    const opts: { model?: string; profile?: string } = {}
+    const opts: { model?: string; profile?: string; provider?: string } = {}
     if (selectedModel.value) opts.model = selectedModel.value
     if (selectedProfile.value) opts.profile = selectedProfile.value
+    if (selectedProvider.value) opts.provider = selectedProvider.value
     send(text, Object.keys(opts).length > 0 ? opts : undefined)
     el.value = ''
   }

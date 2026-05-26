@@ -36,7 +36,7 @@ vi.mock('socket.io-client', () => ({
 
 import { ChatInput } from '../src/components/ChatInput.js'
 import { runStates } from '../src/state/chat.js'
-import { selectedModel, selectedProfile } from '../src/state/settings.js'
+import { selectedModel, selectedProfile, selectedProvider } from '../src/state/settings.js'
 import { activeSessionId } from '../src/state/sessions.js'
 import * as chatModule from '../src/state/chat.js'
 
@@ -49,6 +49,7 @@ describe('ChatInput', () => {
     runStates.value = {}
     selectedModel.value = null
     selectedProfile.value = null
+    selectedProvider.value = null
     mockSend = vi.spyOn(chatModule, 'send').mockImplementation(() => {})
     mockAbort = vi.spyOn(chatModule, 'abort').mockImplementation(() => {})
   })
@@ -163,5 +164,14 @@ describe('ChatInput', () => {
     textarea.value = 'hi'
     fireEvent.submit(textarea.closest('form') as HTMLFormElement)
     expect(mockSend).toHaveBeenCalledWith('hi', { model: 'gpt-4', profile: 'fast' })
+  })
+
+  it('should pass provider when selected', () => {
+    selectedProvider.value = 'anthropic'
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'hi'
+    fireEvent.submit(textarea.closest('form') as HTMLFormElement)
+    expect(mockSend).toHaveBeenCalledWith('hi', { provider: 'anthropic' })
   })
 })
