@@ -1,13 +1,14 @@
 import { useRef, useEffect } from 'preact/hooks'
 import { useSignal } from '@preact/signals'
 import { messages, loading, activeSession } from '../state/sessions.js'
-import { isStreamingHere, chatError, pendingApproval, pendingClarify } from '../state/chat.js'
+import { isStreamingHere, chatError, pendingApproval, pendingClarify, activeCompressionState } from '../state/chat.js'
 import { ChatInput } from './ChatInput.js'
 import { StreamingMessage } from './StreamingMessage.js'
 import { ToolTrace } from './ToolTrace.js'
 import { AgentStatusBar } from './AgentStatusBar.js'
 import { ApprovalDialog } from './ApprovalDialog.js'
 import { ClarifyDialog } from './ClarifyDialog.js'
+import { CompressionIndicator } from './CompressionIndicator.js'
 import { Markdown } from './Markdown.js'
 import { ReasoningBlock } from './ReasoningBlock.js'
 import { isNearBottom, scrollToBottom } from '../lib/auto-scroll.js'
@@ -123,9 +124,13 @@ export function MessageHistory() {
           {isStreamingHere.value && (
             <>
               <AgentStatusBar />
+              <CompressionIndicator />
               <ToolTrace />
               <StreamingMessage />
             </>
+          )}
+          {!isStreamingHere.value && activeCompressionState.value && (
+            <CompressionIndicator />
           )}
           {pendingApproval.value && <ApprovalDialog />}
           {pendingClarify.value && <ClarifyDialog />}

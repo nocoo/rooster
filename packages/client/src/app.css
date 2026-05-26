@@ -722,3 +722,32 @@ html, body, #app {
   display: flex;
   align-items: center;
 }
+
+.compression-indicator {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+}
+
+.compression-indicator--active {
+  background: var(--bgColor-attention-muted, #fff8c5);
+  border: 1px solid var(--borderColor-attention-muted, #d4a72c66);
+}
+
+.compression-indicator--done {
+  background: var(--bgColor-success-muted, #dafbe1);
+  border: 1px solid var(--borderColor-success-muted, #1a7f3766);
+}
+
+.compression-indicator-label {
+  font-weight: 600;
+}
+
+.compression-indicator-detail {
+  color: var(--fgColor-muted, #656d76);
+}
