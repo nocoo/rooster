@@ -40,6 +40,17 @@ export interface ListSessionsOptions {
   profile?: string
 }
 
+export interface SearchSessionsOptions {
+  q: string
+  limit?: number
+  offset?: number
+}
+
+export interface SearchResult {
+  session: Session
+  snippet: string | null
+}
+
 export class SessionStore {
   private readonly db: Database.Database
 
@@ -137,6 +148,56 @@ export class SessionStore {
       return row.cnt
     }
     const row = this.db.prepare('SELECT COUNT(*) as cnt FROM sessions').get() as { cnt: number }
+    return row.cnt
+  }
+
+  search(options: SearchSessionsOptions): SearchResult[] {
+    const { q, limit = 20, offset = 0 } = options
+    const pattern = `%${q}%`
+
+    const rows = this.db.prepare(`
+      SELECT DISTINCT s.*,
+        (SELECT substr(m.content, max(1, instr(m.content, ?) - 40), 120)
+         FROM messages m
+         WHERE m.session_id = s.id
+           AND (m.content LIKE ? OR m.reasoning LIKE ?)
+         LIMIT 1
+        ) as snippet
+      FROM sessions s
+      LEFT JOIN messages m ON m.session_id = s.id
+      WHERE s.title LIKE ?
+        OR s.preview LIKE ?
+        OR s.workspace LIKE ?
+        OR s.profile LIKE ?
+        OR s.model LIKE ?
+        OR s.provider LIKE ?
+        OR m.content LIKE ?
+        OR m.reasoning LIKE ?
+      ORDER BY s.last_active DESC
+      LIMIT ? OFFSET ?
+    `).all(q, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, limit, offset) as Array<Session & { snippet: string | null }>
+
+    return rows.map((row) => {
+      const { snippet, ...session } = row
+      return { session, snippet }
+    })
+  }
+
+  searchCount(q: string): number {
+    const pattern = `%${q}%`
+    const row = this.db.prepare(`
+      SELECT COUNT(DISTINCT s.id) as cnt
+      FROM sessions s
+      LEFT JOIN messages m ON m.session_id = s.id
+      WHERE s.title LIKE ?
+        OR s.preview LIKE ?
+        OR s.workspace LIKE ?
+        OR s.profile LIKE ?
+        OR s.model LIKE ?
+        OR s.provider LIKE ?
+        OR m.content LIKE ?
+        OR m.reasoning LIKE ?
+    `).get(pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern) as { cnt: number }
     return row.cnt
   }
 }

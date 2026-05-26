@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { SessionStore } from '../services/hermes/session-store.js'
 import type { MessageStore } from '../services/hermes/message-store.js'
 import type { AgentBridgeClient } from '../services/hermes/agent-bridge.js'
+import { exportSession } from '../services/hermes/session-export.js'
 
 export interface SessionRouteDeps {
   sessionStore: SessionStore
@@ -12,6 +13,18 @@ export interface SessionRouteDeps {
 export function createSessionRoutes(deps: SessionRouteDeps): Hono {
   const { sessionStore, messageStore, bridge } = deps
   const routes = new Hono()
+
+  routes.get('/search', (c) => {
+    const q = c.req.query('q')
+    if (!q || q.trim() === '') {
+      return c.json({ error: 'Query parameter "q" is required' }, 400)
+    }
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '20', 10), 100)
+    const offset = parseInt(c.req.query('offset') ?? '0', 10)
+    const results = sessionStore.search({ q: q.trim(), limit, offset })
+    const total = sessionStore.searchCount(q.trim())
+    return c.json({ results, total })
+  })
 
   routes.get('/', (c) => {
     const limit = parseInt(c.req.query('limit') ?? '50', 10)
@@ -69,6 +82,25 @@ export function createSessionRoutes(deps: SessionRouteDeps): Hono {
       session_id: id,
     })
     return c.json(result)
+  })
+
+  routes.get('/:id/export', (c) => {
+    const id = c.req.param('id')
+    const format = c.req.query('format') ?? 'json'
+    if (format !== 'json' && format !== 'markdown') {
+      return c.json({ error: 'Invalid format. Use "json" or "markdown"' }, 400)
+    }
+    const session = sessionStore.get(id)
+    if (!session) {
+      return c.json({ error: 'Session not found' }, 404)
+    }
+    const messages = messageStore.list(id)
+    const exported = exportSession(session, messages, format)
+
+    if (format === 'markdown') {
+      return c.text(exported)
+    }
+    return c.json(JSON.parse(exported))
   })
 
   routes.get('/:id', (c) => {
