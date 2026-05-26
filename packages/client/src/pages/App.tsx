@@ -111,8 +111,8 @@ export function App({ url }: { url?: string }) {
             <HomePage path="/" />
             <ChatPage path="/session/:id" />
           </Router>
-          <DebugPanel />
         </div>
+        <DebugPanel />
       </div>
     </div>
   )

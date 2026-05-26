@@ -382,10 +382,11 @@ html, body, #app {
   min-width: 0;
 }
 
-/* Debug panel */
+/* Debug panel (right sidebar) */
 .debug-panel {
-  border-top: 1px solid var(--borderColor-default, var(--color-border-default));
-  max-height: 240px;
+  width: 320px;
+  min-width: 320px;
+  border-left: 1px solid var(--borderColor-default, var(--color-border-default));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -395,7 +396,7 @@ html, body, #app {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--borderColor-default, var(--color-border-default));
   background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
 }
