@@ -15,6 +15,10 @@ vi.mock('../src/api/sessions.js', () => ({
   renameSession: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('socket.io-client', () => ({
+  io: vi.fn(() => ({ on: vi.fn(), emit: vi.fn(), disconnect: vi.fn() })),
+}))
+
 describe('App routing integration', () => {
   beforeEach(() => {
     activeSessionId.value = null
@@ -29,7 +33,7 @@ describe('App routing integration', () => {
 
     const { App } = await import('../src/pages/App.js')
     render(<App url="/" />)
-    expect(screen.getByText('Select a session or start a new one')).toBeTruthy()
+    expect(screen.getByText('Start a new conversation')).toBeTruthy()
   })
 
   it('should render MessageHistory at /session/:id and load messages', async () => {
@@ -48,10 +52,10 @@ describe('App routing integration', () => {
     render(<App url="/session/sess-1" />)
 
     await waitFor(() => {
-      expect(screen.getByText('hello world')).toBeTruthy()
+      expect(screen.getAllByText('hello world').length).toBeGreaterThanOrEqual(1)
     })
 
-    expect(screen.getByText('hi back')).toBeTruthy()
+    expect(screen.getAllByText('hi back').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('My Chat').length).toBeGreaterThanOrEqual(1)
   })
 })

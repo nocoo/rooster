@@ -1,6 +1,11 @@
 import { route } from 'preact-router'
 import { sessions, activeSessionId, removeSession } from '../state/sessions.js'
 
+function startNewChat() {
+  activeSessionId.value = null
+  route('/')
+}
+
 export function SessionList() {
   const items = sessions.value
   const activeId = activeSessionId.value
@@ -9,6 +14,9 @@ export function SessionList() {
     <div class="p-2">
       <div class="d-flex flex-items-center flex-justify-between mb-2 px-2">
         <h3 class="f5 text-bold">Sessions</h3>
+        <button class="btn btn-sm btn-primary" type="button" onClick={startNewChat}>
+          New
+        </button>
       </div>
       {items.length === 0 && (
         <p class="color-fg-muted f6 px-2">No sessions yet</p>

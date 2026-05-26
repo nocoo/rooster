@@ -18,12 +18,17 @@ const mockSendRun = vi.fn()
 const mockSendAbort = vi.fn()
 const mockSetHandlers = vi.fn()
 const mockConnect = vi.fn()
+const mockRoute = vi.fn()
 
 vi.mock('../src/ws/chat.js', () => ({
   connect: (...args: unknown[]) => mockConnect(...args) as unknown,
   setHandlers: (...args: unknown[]) => mockSetHandlers(...args) as unknown,
   sendRun: (...args: unknown[]) => mockSendRun(...args) as unknown,
   sendAbort: (...args: unknown[]) => mockSendAbort(...args) as unknown,
+}))
+
+vi.mock('preact-router', () => ({
+  route: (...args: unknown[]) => mockRoute(...args) as unknown,
 }))
 
 vi.mock('../src/api/sessions.js', () => ({
@@ -50,6 +55,7 @@ describe('state/chat', () => {
     mockSendAbort.mockClear()
     mockSetHandlers.mockClear()
     mockConnect.mockClear()
+    mockRoute.mockClear()
   })
 
   describe('initChat', () => {
@@ -91,6 +97,13 @@ describe('state/chat', () => {
       expect(activeSessionId.value).toBeTruthy()
       expect(sessions.value).toHaveLength(1)
       expect(sessionsTotal.value).toBe(1)
+    })
+
+    it('should navigate to new session', () => {
+      send('hello')
+      const sessionId = activeSessionId.value
+      expect(sessionId).toBeTruthy()
+      expect(mockRoute).toHaveBeenCalledWith(`/session/${sessionId as string}`)
     })
 
     it('should add user message optimistically', () => {

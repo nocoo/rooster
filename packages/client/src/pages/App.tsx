@@ -2,7 +2,9 @@ import Router from 'preact-router'
 import { useEffect } from 'preact/hooks'
 import { SessionList } from '../components/SessionList.js'
 import { MessageHistory } from '../components/MessageHistory.js'
-import { loadSessions, setActiveSession } from '../state/sessions.js'
+import { ChatInput } from '../components/ChatInput.js'
+import { loadSessions, setActiveSession, activeSessionId } from '../state/sessions.js'
+import { initChat } from '../state/chat.js'
 
 function ChatPage({ id }: { path: string; id?: string }) {
   useEffect(() => {
@@ -17,15 +19,27 @@ function ChatPage({ id }: { path: string; id?: string }) {
 }
 
 function HomePage(_props: { path: string }) {
+  if (activeSessionId.value) {
+    return (
+      <div class="flex-1 d-flex flex-column overflow-hidden">
+        <MessageHistory />
+      </div>
+    )
+  }
+
   return (
-    <div class="flex-1 d-flex align-items-center justify-content-center color-fg-muted">
-      <p>Select a session or start a new one</p>
+    <div class="flex-1 d-flex flex-column overflow-hidden">
+      <div class="d-flex align-items-center justify-content-center flex-1 color-fg-muted">
+        <p>Start a new conversation</p>
+      </div>
+      <ChatInput />
     </div>
   )
 }
 
 export function App({ url }: { url?: string }) {
   useEffect(() => {
+    initChat()
     void loadSessions()
   }, [])
 

@@ -1,0 +1,124 @@
+/**
+ * @vitest-environment happy-dom
+ */
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { render, screen, fireEvent, cleanup } from '@testing-library/preact'
+
+vi.mock('../src/ws/chat.js', () => ({
+  connect: vi.fn(),
+  setHandlers: vi.fn(),
+  sendRun: vi.fn(),
+  sendAbort: vi.fn(),
+  sendResume: vi.fn(),
+  connected: { value: false },
+}))
+
+vi.mock('preact-router', () => ({
+  route: vi.fn(),
+}))
+
+vi.mock('../src/api/sessions.js', () => ({
+  fetchSessions: vi.fn().mockResolvedValue({ sessions: [], total: 0 }),
+  fetchMessages: vi.fn().mockResolvedValue({ messages: [] }),
+  deleteSession: vi.fn().mockResolvedValue(undefined),
+  renameSession: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('socket.io-client', () => ({
+  io: vi.fn(() => ({ on: vi.fn(), emit: vi.fn(), disconnect: vi.fn() })),
+}))
+
+import { ChatInput } from '../src/components/ChatInput.js'
+import { streaming, aborting } from '../src/state/chat.js'
+import * as chatModule from '../src/state/chat.js'
+
+describe('ChatInput', () => {
+  let mockSend: ReturnType<typeof vi.spyOn>
+  let mockAbort: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    streaming.value = false
+    aborting.value = false
+    mockSend = vi.spyOn(chatModule, 'send').mockImplementation(() => {})
+    mockAbort = vi.spyOn(chatModule, 'abort').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  it('should render textarea and send button', () => {
+    render(<ChatInput />)
+    expect(screen.getByLabelText('Message input')).toBeTruthy()
+    expect(screen.getByText('Send')).toBeTruthy()
+  })
+
+  it('should call send on form submit', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'hello world'
+    fireEvent.submit(textarea.closest('form') as HTMLFormElement)
+    expect(mockSend).toHaveBeenCalledWith('hello world')
+  })
+
+  it('should clear textarea after send', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'hello'
+    fireEvent.submit(textarea.closest('form') as HTMLFormElement)
+    expect(textarea.value).toBe('')
+  })
+
+  it('should not send empty input', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = '   '
+    fireEvent.submit(textarea.closest('form') as HTMLFormElement)
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('should send on Enter key', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'test'
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
+    expect(mockSend).toHaveBeenCalledWith('test')
+  })
+
+  it('should not send on Shift+Enter', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'test'
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true })
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('should show Stop button when streaming', () => {
+    streaming.value = true
+    render(<ChatInput />)
+    expect(screen.getByText('Stop')).toBeTruthy()
+  })
+
+  it('should call abort on Stop click', () => {
+    streaming.value = true
+    render(<ChatInput />)
+    fireEvent.click(screen.getByText('Stop'))
+    expect(mockAbort).toHaveBeenCalled()
+  })
+
+  it('should disable Stop button when aborting', () => {
+    streaming.value = true
+    aborting.value = true
+    render(<ChatInput />)
+    const btn = screen.getByText('Stopping…')
+    expect((btn as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('should disable textarea when streaming', () => {
+    streaming.value = true
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    expect(textarea.disabled).toBe(true)
+  })
+})

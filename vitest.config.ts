@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config'
 import preact from '@preact/preset-vite'
 
 export default defineConfig({
-  plugins: [preact()],
+  plugins: [preact({ devToolsEnabled: false })],
   test: {
     coverage: {
       provider: 'v8',

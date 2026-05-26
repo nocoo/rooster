@@ -1,4 +1,5 @@
 import { signal, computed } from '@preact/signals'
+import { route } from 'preact-router'
 import {
   connect,
   setHandlers,
@@ -51,6 +52,7 @@ export function send(input: string, opts?: { model?: string; profile?: string; p
       ...sessions.value,
     ]
     sessionsTotal.value += 1
+    route(`/session/${sessionId}`)
   }
 
   const userMessage: Message = {
