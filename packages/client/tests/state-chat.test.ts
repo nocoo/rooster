@@ -18,6 +18,8 @@ import {
   respondApproval,
   respondClarify,
   runStates,
+  compressionStates,
+  activeCompressionState,
 } from '../src/state/chat.js'
 import { sessions, sessionsTotal, activeSessionId, messages } from '../src/state/sessions.js'
 
@@ -52,6 +54,7 @@ vi.mock('../src/api/sessions.js', () => ({
 describe('state/chat', () => {
   beforeEach(() => {
     runStates.value = {}
+    compressionStates.value = {}
     activeSessionId.value = null
     sessions.value = []
     sessionsTotal.value = 0
@@ -289,6 +292,8 @@ describe('state/chat', () => {
       onApprovalResolved: Handler
       onClarifyRequested: Handler
       onClarifyResolved: Handler
+      onCompressionStarted: Handler
+      onCompressionCompleted: Handler
       onResumed: Handler
     }
 
@@ -803,6 +808,150 @@ describe('state/chat', () => {
         expect(streaming.value).toBe(false)
         expect(aborting.value).toBe(false)
       })
+    })
+  })
+
+  describe('compression state', () => {
+    type Handler = (...args: unknown[]) => void
+    type CompressionHandlers = {
+      onRunStarted: Handler
+      onCompressionStarted: Handler
+      onCompressionCompleted: Handler
+    }
+
+    function getHandlers(): CompressionHandlers {
+      initChat()
+      return mockSetHandlers.mock.calls[0]?.[0] as CompressionHandlers
+    }
+
+    it('should register compression handlers on initChat', () => {
+      initChat()
+      const handlers = mockSetHandlers.mock.calls[0]?.[0] as Record<string, unknown>
+      expect(typeof handlers['onCompressionStarted']).toBe('function')
+      expect(typeof handlers['onCompressionCompleted']).toBe('function')
+    })
+
+    it('should set compressing state on compression.started', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onCompressionStarted']({
+        event: 'compression.started',
+        session_id: 's1',
+        run_id: 'r1',
+        request_id: 'comp-1',
+        message_count: 30,
+        token_count: 100000,
+        source: 'auto',
+      })
+      expect(compressionStates.value['s1']).toEqual({
+        status: 'compressing',
+        request_id: 'comp-1',
+        message_count: 30,
+        token_count: 100000,
+        source: 'auto',
+      })
+      expect(activeCompressionState.value?.status).toBe('compressing')
+    })
+
+    it('should set completed state on compression.completed', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onCompressionCompleted']({
+        event: 'compression.completed',
+        session_id: 's1',
+        run_id: 'r1',
+        request_id: 'comp-1',
+        compressed: true,
+        totalMessages: 30,
+        resultMessages: 6,
+        beforeTokens: 100000,
+        afterTokens: 20000,
+        contextTokens: 200000,
+        summaryTokens: 2500,
+      })
+      expect(compressionStates.value['s1']).toEqual({
+        status: 'completed',
+        request_id: 'comp-1',
+        compressed: true,
+        totalMessages: 30,
+        resultMessages: 6,
+        beforeTokens: 100000,
+        afterTokens: 20000,
+        contextTokens: 200000,
+        summaryTokens: 2500,
+      })
+    })
+
+    it('should overwrite old completed state on new compression.started', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      compressionStates.value = {
+        's1': { status: 'completed', compressed: true, beforeTokens: 80000, afterTokens: 15000 },
+      }
+      h['onCompressionStarted']({
+        event: 'compression.started',
+        session_id: 's1',
+        run_id: 'r2',
+        message_count: 50,
+        token_count: 150000,
+      })
+      expect(compressionStates.value['s1']?.status).toBe('compressing')
+      expect(compressionStates.value['s1']?.message_count).toBe(50)
+    })
+
+    it('should clear compression state on new run.started', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      compressionStates.value = {
+        's1': { status: 'completed', compressed: true, beforeTokens: 80000, afterTokens: 15000 },
+      }
+      h['onRunStarted']({ event: 'run.started', session_id: 's1', run_id: 'r2', queue_length: 0 })
+      expect(compressionStates.value['s1']).toBeUndefined()
+    })
+
+    it('should isolate compression state between sessions', () => {
+      const h = getHandlers()
+      h['onCompressionStarted']({
+        event: 'compression.started',
+        session_id: 's1',
+        run_id: 'r1',
+        message_count: 10,
+      })
+      h['onCompressionCompleted']({
+        event: 'compression.completed',
+        session_id: 's2',
+        run_id: 'r2',
+        compressed: true,
+        afterTokens: 5000,
+      })
+      expect(compressionStates.value['s1']?.status).toBe('compressing')
+      expect(compressionStates.value['s2']?.status).toBe('completed')
+
+      activeSessionId.value = 's1'
+      expect(activeCompressionState.value?.status).toBe('compressing')
+      activeSessionId.value = 's2'
+      expect(activeCompressionState.value?.status).toBe('completed')
+    })
+
+    it('should not clear other session compression on run.started', () => {
+      const h = getHandlers()
+      compressionStates.value = {
+        's1': { status: 'completed', compressed: true },
+        's2': { status: 'compressing', message_count: 20 },
+      }
+      h['onRunStarted']({ event: 'run.started', session_id: 's1', run_id: 'r2', queue_length: 0 })
+      expect(compressionStates.value['s1']).toBeUndefined()
+      expect(compressionStates.value['s2']?.status).toBe('compressing')
+    })
+
+    it('should return null for activeCompressionState when no active session', () => {
+      activeSessionId.value = null
+      expect(activeCompressionState.value).toBeNull()
+    })
+
+    it('should return null for activeCompressionState when session has no compression', () => {
+      activeSessionId.value = 's1'
+      expect(activeCompressionState.value).toBeNull()
     })
   })
 })

@@ -152,6 +152,30 @@ export interface ClarifyResolvedPayload {
   clarify_id: string
 }
 
+export interface CompressionStartedPayload {
+  event: 'compression.started'
+  session_id: string
+  run_id: string
+  request_id?: string
+  message_count?: number
+  token_count?: number
+  source?: string
+}
+
+export interface CompressionCompletedPayload {
+  event: 'compression.completed'
+  session_id: string
+  run_id: string
+  request_id?: string
+  compressed?: boolean
+  totalMessages?: number
+  resultMessages?: number
+  beforeTokens?: number
+  afterTokens?: number
+  contextTokens?: number
+  summaryTokens?: number
+}
+
 export interface ResumedPayload {
   event: 'resumed'
   session_id: string
@@ -178,6 +202,8 @@ export type ChatEventHandler = {
   onApprovalResolved?: (payload: ApprovalResolvedPayload) => void
   onClarifyRequested?: (payload: ClarifyRequestedPayload) => void
   onClarifyResolved?: (payload: ClarifyResolvedPayload) => void
+  onCompressionStarted?: (payload: CompressionStartedPayload) => void
+  onCompressionCompleted?: (payload: CompressionCompletedPayload) => void
   onResumed?: (payload: ResumedPayload) => void
 }
 
@@ -212,6 +238,8 @@ export function connect(): void {
   socket.on('approval.resolved', (d: ApprovalResolvedPayload) => { handlers.onApprovalResolved?.(d) })
   socket.on('clarify.requested', (d: ClarifyRequestedPayload) => { handlers.onClarifyRequested?.(d) })
   socket.on('clarify.resolved', (d: ClarifyResolvedPayload) => { handlers.onClarifyResolved?.(d) })
+  socket.on('compression.started', (d: CompressionStartedPayload) => { handlers.onCompressionStarted?.(d) })
+  socket.on('compression.completed', (d: CompressionCompletedPayload) => { handlers.onCompressionCompleted?.(d) })
   socket.on('resumed', (d: ResumedPayload) => { handlers.onResumed?.(d) })
 }
 

@@ -24,6 +24,8 @@ import {
   type ApprovalResolvedPayload,
   type ClarifyRequestedPayload,
   type ClarifyResolvedPayload,
+  type CompressionStartedPayload,
+  type CompressionCompletedPayload,
   type ResumedPayload,
 } from '../ws/chat.js'
 import { sessions, sessionsTotal, activeSessionId, messages, loadSessions } from './sessions.js'
@@ -128,6 +130,29 @@ export const anySessionWorking = computed(() =>
   Object.values(runStates.value).some((s) => s.streaming || s.aborting),
 )
 
+export interface CompressionState {
+  status: 'compressing' | 'completed'
+  request_id?: string
+  message_count?: number
+  token_count?: number
+  source?: string
+  compressed?: boolean
+  totalMessages?: number
+  resultMessages?: number
+  beforeTokens?: number
+  afterTokens?: number
+  contextTokens?: number
+  summaryTokens?: number
+}
+
+export const compressionStates = signal<Record<string, CompressionState>>({})
+
+export const activeCompressionState = computed<CompressionState | null>(() => {
+  const sid = activeSessionId.value
+  if (!sid) return null
+  return compressionStates.value[sid] ?? null
+})
+
 export function initChat(): void {
   setHandlers({
     onRunStarted: handleRunStarted,
@@ -146,6 +171,8 @@ export function initChat(): void {
     onApprovalResolved: handleApprovalResolved,
     onClarifyRequested: handleClarifyRequested,
     onClarifyResolved: handleClarifyResolved,
+    onCompressionStarted: handleCompressionStarted,
+    onCompressionCompleted: handleCompressionCompleted,
     onResumed: handleResumed,
   })
   connect()
@@ -226,6 +253,8 @@ export function respondClarify(response: string): void {
 
 function handleRunStarted(payload: RunStartedPayload): void {
   pushDebugEvent('run.started', payload)
+  const entries = Object.entries(compressionStates.value).filter(([key]) => key !== payload.session_id)
+  compressionStates.value = Object.fromEntries(entries)
   setState(payload.session_id, { runId: payload.run_id })
 }
 
@@ -403,6 +432,38 @@ function handleClarifyRequested(payload: ClarifyRequestedPayload): void {
 function handleClarifyResolved(payload: ClarifyResolvedPayload): void {
   pushDebugEvent('clarify.resolved', payload)
   setState(payload.session_id, { clarify: null })
+}
+
+function handleCompressionStarted(payload: CompressionStartedPayload): void {
+  pushDebugEvent('compression.started', payload)
+  compressionStates.value = {
+    ...compressionStates.value,
+    [payload.session_id]: {
+      status: 'compressing',
+      ...(payload.request_id ? { request_id: payload.request_id } : {}),
+      ...(payload.message_count != null ? { message_count: payload.message_count } : {}),
+      ...(payload.token_count != null ? { token_count: payload.token_count } : {}),
+      ...(payload.source ? { source: payload.source } : {}),
+    },
+  }
+}
+
+function handleCompressionCompleted(payload: CompressionCompletedPayload): void {
+  pushDebugEvent('compression.completed', payload)
+  compressionStates.value = {
+    ...compressionStates.value,
+    [payload.session_id]: {
+      status: 'completed',
+      ...(payload.request_id ? { request_id: payload.request_id } : {}),
+      ...(payload.compressed != null ? { compressed: payload.compressed } : {}),
+      ...(payload.totalMessages != null ? { totalMessages: payload.totalMessages } : {}),
+      ...(payload.resultMessages != null ? { resultMessages: payload.resultMessages } : {}),
+      ...(payload.beforeTokens != null ? { beforeTokens: payload.beforeTokens } : {}),
+      ...(payload.afterTokens != null ? { afterTokens: payload.afterTokens } : {}),
+      ...(payload.contextTokens != null ? { contextTokens: payload.contextTokens } : {}),
+      ...(payload.summaryTokens != null ? { summaryTokens: payload.summaryTokens } : {}),
+    },
+  }
 }
 
 function handleResumed(payload: ResumedPayload): void {
