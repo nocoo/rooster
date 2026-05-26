@@ -61,6 +61,7 @@ html, body, #app {
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  position: relative;
   background: var(--bgColor-default, var(--color-canvas-default));
 }
 
@@ -68,6 +69,30 @@ html, body, #app {
   flex: 1;
   overflow-y: auto;
   padding: 24px 32px;
+}
+
+.jump-to-bottom {
+  position: absolute;
+  bottom: 80px;
+  right: 32px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--borderColor-default, var(--color-border-default));
+  background: var(--bgColor-default, var(--color-canvas-default));
+  color: var(--fgColor-default, var(--color-fg-default));
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jump-to-bottom:hover {
+  background: var(--bgColor-muted, var(--color-canvas-subtle));
 }
 
 .chat-input-area {

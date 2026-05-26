@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/preact'
+import { render, screen, fireEvent } from '@testing-library/preact'
 import { MessageHistory } from '../src/components/MessageHistory.js'
 import { messages, loading, activeSessionId, sessions } from '../src/state/sessions.js'
 import { runStates } from '../src/state/chat.js'
@@ -22,6 +22,12 @@ vi.mock('../src/ws/chat.js', () => ({
   sendApprovalRespond: vi.fn(),
   sendClarifyRespond: vi.fn(),
 }))
+
+function mockScrollable(el: Element, opts: { scrollHeight: number; clientHeight: number; scrollTop: number }) {
+  Object.defineProperty(el, 'scrollHeight', { value: opts.scrollHeight, writable: true, configurable: true })
+  Object.defineProperty(el, 'clientHeight', { value: opts.clientHeight, writable: true, configurable: true })
+  Object.defineProperty(el, 'scrollTop', { value: opts.scrollTop, writable: true, configurable: true })
+}
 
 describe('MessageHistory', () => {
   beforeEach(() => {
@@ -120,5 +126,84 @@ describe('MessageHistory', () => {
     const { container } = render(<MessageHistory />)
     expect(container.querySelector('.approval-dialog')).toBeNull()
     expect(container.querySelector('.clarify-dialog')).toBeNull()
+  })
+
+  it('should render error bubble when chatError is set', () => {
+    sessions.value = [{ id: 's1', title: 'Chat', started_at: '2025-01-01', last_active: '2025-01-01' }]
+    activeSessionId.value = 's1'
+    runStates.value = { 's1': { streaming: false, aborting: false, runId: null, output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: 'Connection lost' } }
+
+    render(<MessageHistory />)
+    expect(screen.getByText('Connection lost')).toBeTruthy()
+  })
+})
+
+describe('MessageHistory — jump to bottom', () => {
+  beforeEach(() => {
+    sessions.value = [{ id: 's1', title: 'Chat', started_at: '2025-01-01', last_active: '2025-01-01' }]
+    activeSessionId.value = 's1'
+    messages.value = [
+      { id: 'm1', session_id: 's1', role: 'user', content: 'Hello', timestamp: '2025-01-01T12:00:00Z' },
+    ]
+    loading.value = false
+    runStates.value = {}
+  })
+
+  function getScrollEl(container: Element): HTMLElement {
+    const el = container.querySelector('.chat-messages')
+    expect(el).toBeTruthy()
+    return el as HTMLElement
+  }
+
+  it('should not show jump button when at bottom (following)', () => {
+    const { container } = render(<MessageHistory />)
+    expect(container.querySelector('.jump-to-bottom')).toBeNull()
+  })
+
+  it('should show jump button after scrolling away from bottom', () => {
+    const { container } = render(<MessageHistory />)
+    const scrollEl = getScrollEl(container)
+    mockScrollable(scrollEl, { scrollHeight: 2000, clientHeight: 400, scrollTop: 100 })
+    fireEvent.scroll(scrollEl)
+    expect(container.querySelector('.jump-to-bottom')).toBeTruthy()
+  })
+
+  it('should hide jump button after scrolling back near bottom', () => {
+    const { container } = render(<MessageHistory />)
+    const scrollEl = getScrollEl(container)
+
+    mockScrollable(scrollEl, { scrollHeight: 2000, clientHeight: 400, scrollTop: 100 })
+    fireEvent.scroll(scrollEl)
+    expect(container.querySelector('.jump-to-bottom')).toBeTruthy()
+
+    mockScrollable(scrollEl, { scrollHeight: 2000, clientHeight: 400, scrollTop: 1570 })
+    fireEvent.scroll(scrollEl)
+    expect(container.querySelector('.jump-to-bottom')).toBeNull()
+  })
+
+  it('should scroll to bottom and hide button on jump click', () => {
+    const { container } = render(<MessageHistory />)
+    const scrollEl = getScrollEl(container)
+
+    mockScrollable(scrollEl, { scrollHeight: 2000, clientHeight: 400, scrollTop: 100 })
+    fireEvent.scroll(scrollEl)
+
+    const jumpBtn = container.querySelector('.jump-to-bottom') as HTMLButtonElement
+    expect(jumpBtn).toBeTruthy()
+    fireEvent.click(jumpBtn)
+
+    expect(scrollEl.scrollTop).toBe(1600)
+    expect(container.querySelector('.jump-to-bottom')).toBeNull()
+  })
+
+  it('should have accessible label on jump button', () => {
+    const { container } = render(<MessageHistory />)
+    const scrollEl = getScrollEl(container)
+    mockScrollable(scrollEl, { scrollHeight: 2000, clientHeight: 400, scrollTop: 100 })
+    fireEvent.scroll(scrollEl)
+
+    const btn = container.querySelector('.jump-to-bottom') as HTMLButtonElement
+    expect(btn).toBeTruthy()
+    expect(btn.getAttribute('aria-label')).toBe('Jump to bottom')
   })
 })

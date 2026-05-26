@@ -1,5 +1,7 @@
+import { useRef, useEffect } from 'preact/hooks'
+import { useSignal } from '@preact/signals'
 import { messages, loading, activeSession } from '../state/sessions.js'
-import { isStreamingHere, chatError, pendingApproval, pendingClarify } from '../state/chat.js'
+import { isStreamingHere, chatError, pendingApproval, pendingClarify, streamOutput } from '../state/chat.js'
 import { ChatInput } from './ChatInput.js'
 import { StreamingMessage } from './StreamingMessage.js'
 import { ToolTrace } from './ToolTrace.js'
@@ -8,11 +10,37 @@ import { ApprovalDialog } from './ApprovalDialog.js'
 import { ClarifyDialog } from './ClarifyDialog.js'
 import { Markdown } from './Markdown.js'
 import { ReasoningBlock } from './ReasoningBlock.js'
+import { isNearBottom, scrollToBottom } from '../lib/auto-scroll.js'
 
 export function MessageHistory() {
   const msgs = messages.value
   const session = activeSession.value
   const isLoading = loading.value
+  const containerRef = useRef<HTMLDivElement>(null)
+  const following = useSignal(true)
+
+  useEffect(() => {
+    following.value = true
+  }, [session?.id])
+
+  useEffect(() => {
+    if (following.value && containerRef.current) {
+      scrollToBottom(containerRef.current)
+    }
+  }, [msgs.length, streamOutput.value, isStreamingHere.value])
+
+  function handleScroll() {
+    const el = containerRef.current
+    if (!el) return
+    following.value = isNearBottom(el)
+  }
+
+  function handleJumpToBottom() {
+    const el = containerRef.current
+    if (!el) return
+    scrollToBottom(el)
+    following.value = true
+  }
 
   if (!session) {
     return (
@@ -36,7 +64,7 @@ export function MessageHistory() {
 
   return (
     <div class="app-chat">
-      <div class="chat-messages">
+      <div class="chat-messages" ref={containerRef} onScroll={handleScroll}>
         {msgs.length === 0 && !isStreamingHere.value && (
           <p class="color-fg-muted f5">No messages in this session</p>
         )}
@@ -81,6 +109,16 @@ export function MessageHistory() {
           </div>
         )}
       </div>
+      {!following.value && (
+        <button
+          type="button"
+          class="jump-to-bottom"
+          onClick={handleJumpToBottom}
+          aria-label="Jump to bottom"
+        >
+          ↓
+        </button>
+      )}
       <div class="chat-input-area">
         <ChatInput />
       </div>
