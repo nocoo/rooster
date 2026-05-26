@@ -17,6 +17,12 @@ vi.mock('preact-router', () => ({
   route: vi.fn(),
 }))
 
+vi.mock('../src/api/settings.js', () => ({
+  fetchProfiles: vi.fn().mockResolvedValue([]),
+  fetchModels: vi.fn().mockResolvedValue([]),
+  fetchProviders: vi.fn().mockResolvedValue([]),
+}))
+
 vi.mock('../src/api/sessions.js', () => ({
   fetchSessions: vi.fn().mockResolvedValue({ sessions: [], total: 0 }),
   fetchMessages: vi.fn().mockResolvedValue({ messages: [] }),
@@ -30,6 +36,7 @@ vi.mock('socket.io-client', () => ({
 
 import { ChatInput } from '../src/components/ChatInput.js'
 import { streaming, aborting } from '../src/state/chat.js'
+import { selectedModel, selectedProfile } from '../src/state/settings.js'
 import * as chatModule from '../src/state/chat.js'
 
 describe('ChatInput', () => {
@@ -39,6 +46,8 @@ describe('ChatInput', () => {
   beforeEach(() => {
     streaming.value = false
     aborting.value = false
+    selectedModel.value = null
+    selectedProfile.value = null
     mockSend = vi.spyOn(chatModule, 'send').mockImplementation(() => {})
     mockAbort = vi.spyOn(chatModule, 'abort').mockImplementation(() => {})
   })
@@ -59,7 +68,7 @@ describe('ChatInput', () => {
     const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
     textarea.value = 'hello world'
     fireEvent.submit(textarea.closest('form') as HTMLFormElement)
-    expect(mockSend).toHaveBeenCalledWith('hello world')
+    expect(mockSend).toHaveBeenCalledWith('hello world', undefined)
   })
 
   it('should clear textarea after send', () => {
@@ -83,7 +92,7 @@ describe('ChatInput', () => {
     const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
     textarea.value = 'test'
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
-    expect(mockSend).toHaveBeenCalledWith('test')
+    expect(mockSend).toHaveBeenCalledWith('test', undefined)
   })
 
   it('should not send on Shift+Enter', () => {
@@ -120,5 +129,15 @@ describe('ChatInput', () => {
     render(<ChatInput />)
     const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
     expect(textarea.disabled).toBe(true)
+  })
+
+  it('should pass model and profile when selected', () => {
+    selectedModel.value = 'gpt-4'
+    selectedProfile.value = 'fast'
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'hi'
+    fireEvent.submit(textarea.closest('form') as HTMLFormElement)
+    expect(mockSend).toHaveBeenCalledWith('hi', { model: 'gpt-4', profile: 'fast' })
   })
 })

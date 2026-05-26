@@ -3,8 +3,10 @@ import { useEffect } from 'preact/hooks'
 import { SessionList } from '../components/SessionList.js'
 import { MessageHistory } from '../components/MessageHistory.js'
 import { ChatInput } from '../components/ChatInput.js'
+import { HeaderSettings } from '../components/HeaderSettings.js'
 import { loadSessions, setActiveSession, activeSessionId } from '../state/sessions.js'
 import { initChat } from '../state/chat.js'
+import { loadSettings } from '../state/settings.js'
 
 function ChatPage({ id }: { path: string; id?: string }) {
   useEffect(() => {
@@ -41,6 +43,7 @@ export function App({ url }: { url?: string }) {
   useEffect(() => {
     initChat()
     void loadSessions()
+    void loadSettings()
   }, [])
 
   return (
@@ -48,6 +51,10 @@ export function App({ url }: { url?: string }) {
       <header class="Header">
         <div class="Header-item">
           <a class="Header-link f4 text-bold" href="/">Rooster</a>
+        </div>
+        <div class="Header-item Header-item--full" />
+        <div class="Header-item">
+          <HeaderSettings />
         </div>
       </header>
       <main class="d-flex flex-1 overflow-hidden">
