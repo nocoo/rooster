@@ -131,6 +131,14 @@ describe('ChatInput', () => {
     expect(textarea.disabled).toBe(true)
   })
 
+  it('should not send on Enter during IME composition', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = '你好'
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false, isComposing: true })
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
   it('should pass model and profile when selected', () => {
     selectedModel.value = 'gpt-4'
     selectedProfile.value = 'fast'
