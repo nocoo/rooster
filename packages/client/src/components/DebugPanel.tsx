@@ -1,9 +1,13 @@
+import { signal } from '@preact/signals'
 import hljs from 'highlight.js/lib/core'
 import json from 'highlight.js/lib/languages/json'
 import { debugEnabled, debugEvents, clearDebugEvents } from '../state/debug.js'
+import { activeSessionId } from '../state/sessions.js'
 import type { DebugEvent } from '../state/debug.js'
 
 hljs.registerLanguage('json', json)
+
+const showAll = signal(false)
 
 const EVENT_ICONS: Record<string, string> = {
   'run.started': '\u{1F680}',
@@ -29,6 +33,14 @@ function highlightJson(payload: unknown): string {
   return hljs.highlight(raw, { language: 'json' }).value
 }
 
+function getSessionId(payload: unknown): string | undefined {
+  if (payload && typeof payload === 'object' && 'session_id' in payload) {
+    const sid = (payload as Record<string, unknown>)['session_id']
+    return typeof sid === 'string' ? sid : undefined
+  }
+  return undefined
+}
+
 function DebugEventItem({ entry }: { entry: DebugEvent }) {
   const time = new Date(entry.time).toLocaleTimeString()
   const html = highlightJson(entry.payload)
@@ -47,21 +59,37 @@ function DebugEventItem({ entry }: { entry: DebugEvent }) {
 export function DebugPanel() {
   if (!debugEnabled.value) return null
 
-  const events = debugEvents.value
+  const allEvents = debugEvents.value
+  const sessionId = activeSessionId.value
+  const filtered = showAll.value
+    ? allEvents
+    : allEvents.filter((e) => {
+        const sid = getSessionId(e.payload)
+        return !sid || sid === sessionId
+      })
 
   return (
     <div class="debug-panel">
       <div class="debug-panel-header">
-        <span class="text-bold f6">Debug Events ({events.length})</span>
-        <button type="button" class="btn btn-sm" onClick={clearDebugEvents}>
-          Clear
-        </button>
+        <span class="text-bold f6">Debug ({filtered.length})</span>
+        <div class="d-flex gap-1">
+          <button
+            type="button"
+            class={`btn btn-sm${showAll.value ? '' : ' btn-outline'}`}
+            onClick={() => { showAll.value = !showAll.value }}
+          >
+            {showAll.value ? 'All' : 'Session'}
+          </button>
+          <button type="button" class="btn btn-sm" onClick={clearDebugEvents}>
+            Clear
+          </button>
+        </div>
       </div>
       <div class="debug-panel-body">
-        {events.length === 0 && (
+        {filtered.length === 0 && (
           <p class="color-fg-muted f6 p-2">No events captured yet.</p>
         )}
-        {events.map((entry) => (
+        {filtered.map((entry) => (
           <DebugEventItem key={entry.id} entry={entry} />
         ))}
       </div>

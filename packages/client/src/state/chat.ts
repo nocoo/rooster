@@ -33,6 +33,7 @@ export interface AgentStatus {
 }
 
 export const streaming = signal(false)
+export const streamingSessionId = signal<string | null>(null)
 export const aborting = signal(false)
 export const currentRunId = signal<string | null>(null)
 export const streamOutput = signal('')
@@ -43,6 +44,7 @@ export const agentEvents = signal<AgentStatus[]>([])
 export const chatError = signal<string | null>(null)
 
 export const isWorking = computed(() => streaming.value || aborting.value)
+export const isStreamingHere = computed(() => streaming.value && streamingSessionId.value === activeSessionId.value)
 
 export function initChat(): void {
   setHandlers({
@@ -85,6 +87,7 @@ export function send(input: string, opts?: { model?: string; profile?: string; p
   messages.value = [...messages.value, userMessage]
 
   streaming.value = true
+  streamingSessionId.value = sessionId
   chatError.value = null
   streamOutput.value = ''
   reasoningText.value = ''
@@ -101,7 +104,7 @@ export function send(input: string, opts?: { model?: string; profile?: string; p
 }
 
 export function abort(): void {
-  const sessionId = activeSessionId.value
+  const sessionId = streamingSessionId.value
   if (!sessionId || !streaming.value) return
   aborting.value = true
   sendAbort(sessionId)
@@ -141,6 +144,7 @@ function handleRunCompleted(payload: RunCompletedPayload): void {
   streaming.value = false
   aborting.value = false
   currentRunId.value = null
+  streamingSessionId.value = null
   streamOutput.value = ''
   reasoningText.value = ''
   reasoningDone.value = false
@@ -169,6 +173,7 @@ function handleRunFailed(payload: RunFailedPayload): void {
   streaming.value = false
   aborting.value = false
   currentRunId.value = null
+  streamingSessionId.value = null
   streamOutput.value = ''
 }
 
@@ -207,6 +212,7 @@ function handleAbortCompleted(payload: AbortCompletedPayload): void {
   streaming.value = false
   aborting.value = false
   currentRunId.value = null
+  streamingSessionId.value = null
 }
 
 function handleReasoningDelta(payload: ReasoningDeltaPayload): void {

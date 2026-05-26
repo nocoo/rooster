@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   streaming,
+  streamingSessionId,
   aborting,
   currentRunId,
   streamOutput,
@@ -43,6 +44,7 @@ vi.mock('../src/api/sessions.js', () => ({
 describe('state/chat', () => {
   beforeEach(() => {
     streaming.value = false
+    streamingSessionId.value = null
     aborting.value = false
     currentRunId.value = null
     streamOutput.value = ''
@@ -154,6 +156,7 @@ describe('state/chat', () => {
   describe('abort', () => {
     it('should call sendAbort when streaming', () => {
       activeSessionId.value = 's1'
+      streamingSessionId.value = 's1'
       streaming.value = true
       abort()
       expect(aborting.value).toBe(true)
@@ -167,8 +170,9 @@ describe('state/chat', () => {
       expect(mockSendAbort).not.toHaveBeenCalled()
     })
 
-    it('should not abort without active session', () => {
+    it('should not abort without streaming session', () => {
       streaming.value = true
+      streamingSessionId.value = null
       abort()
       expect(aborting.value).toBe(false)
       expect(mockSendAbort).not.toHaveBeenCalled()

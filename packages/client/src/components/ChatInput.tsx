@@ -1,5 +1,5 @@
 import { useRef } from 'preact/hooks'
-import { streaming, aborting, send, abort } from '../state/chat.js'
+import { isStreamingHere, aborting, send, abort } from '../state/chat.js'
 import { selectedModel, selectedProfile } from '../state/settings.js'
 
 export function ChatInput() {
@@ -25,7 +25,7 @@ export function ChatInput() {
     }
   }
 
-  const isStreaming = streaming.value
+  const isStreaming = isStreamingHere.value
   const isAborting = aborting.value
 
   return (

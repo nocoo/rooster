@@ -1,5 +1,5 @@
 import { messages, loading, activeSession } from '../state/sessions.js'
-import { streaming, chatError } from '../state/chat.js'
+import { isStreamingHere, chatError } from '../state/chat.js'
 import { ChatInput } from './ChatInput.js'
 import { StreamingMessage } from './StreamingMessage.js'
 import { ToolTrace } from './ToolTrace.js'
@@ -34,7 +34,7 @@ export function MessageHistory() {
   return (
     <div class="app-chat">
       <div class="chat-messages">
-        {msgs.length === 0 && !streaming.value && (
+        {msgs.length === 0 && !isStreamingHere.value && (
           <p class="color-fg-muted f5">No messages in this session</p>
         )}
         {msgs.map((msg) => (
@@ -55,7 +55,7 @@ export function MessageHistory() {
             )}
           </div>
         ))}
-        {streaming.value && (
+        {isStreamingHere.value && (
           <>
             <AgentStatusBar />
             <ToolTrace />
