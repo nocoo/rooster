@@ -19,7 +19,9 @@ export function ChatInput() {
   }
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- keyCode 229 is the only reliable IME guard in some browsers
+    const isComposing = e.isComposing || e.keyCode === 229 || e.which === 229
+    if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
       e.preventDefault()
       handleSubmit(e)
     }

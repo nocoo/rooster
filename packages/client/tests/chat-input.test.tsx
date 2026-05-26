@@ -139,6 +139,22 @@ describe('ChatInput', () => {
     expect(mockSend).not.toHaveBeenCalled()
   })
 
+  it('should not send on Enter with keyCode 229 (IME tail event)', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = '你好'
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false, isComposing: false, keyCode: 229 })
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('should not send on Enter with which 229 (IME tail event)', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = '你好'
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false, isComposing: false, which: 229 })
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
   it('should pass model and profile when selected', () => {
     selectedModel.value = 'gpt-4'
     selectedProfile.value = 'fast'
