@@ -260,6 +260,30 @@ function emitBridgeEvent(
       run_id: runId,
       clarify_id: str(evt['clarify_id']),
     })
+  } else if (type === 'compression.started') {
+    emitter.emit('compression.started', {
+      event: 'compression.started',
+      session_id: sessionId,
+      run_id: runId,
+      request_id: str(evt['request_id']) || undefined,
+      message_count: typeof evt['message_count'] === 'number' ? evt['message_count'] : undefined,
+      token_count: typeof evt['token_count'] === 'number' ? evt['token_count'] : undefined,
+      source: str(evt['source']) || undefined,
+    })
+  } else if (type === 'compression.completed') {
+    emitter.emit('compression.completed', {
+      event: 'compression.completed',
+      session_id: sessionId,
+      run_id: runId,
+      request_id: str(evt['request_id']) || undefined,
+      compressed: evt['compressed'] === true ? true : evt['compressed'] === false ? false : undefined,
+      totalMessages: typeof evt['totalMessages'] === 'number' ? evt['totalMessages'] : undefined,
+      resultMessages: typeof evt['resultMessages'] === 'number' ? evt['resultMessages'] : undefined,
+      beforeTokens: typeof evt['beforeTokens'] === 'number' ? evt['beforeTokens'] : undefined,
+      afterTokens: typeof evt['afterTokens'] === 'number' ? evt['afterTokens'] : undefined,
+      contextTokens: typeof evt['contextTokens'] === 'number' ? evt['contextTokens'] : undefined,
+      summaryTokens: typeof evt['summaryTokens'] === 'number' ? evt['summaryTokens'] : undefined,
+    })
   } else {
     emitter.emit('agent.event', { ...evt, event: 'agent.event', type, session_id: sessionId, run_id: runId })
   }

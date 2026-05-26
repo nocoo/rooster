@@ -1714,6 +1714,173 @@ describe('Socket.IO /chat-run', () => {
     })
   })
 
+  describe('run — compression events', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{
+              event: 'compression.started',
+              request_id: 'comp-1',
+              message_count: 42,
+              token_count: 128000,
+              source: 'auto',
+            }],
+            done: false,
+          },
+          {
+            delta: '',
+            output: '',
+            cursor: 2,
+            event_cursor: 2,
+            events: [{
+              event: 'compression.completed',
+              request_id: 'comp-1',
+              compressed: true,
+              totalMessages: 42,
+              resultMessages: 8,
+              beforeTokens: 128000,
+              afterTokens: 24000,
+              contextTokens: 200000,
+              summaryTokens: 3200,
+            }],
+            done: false,
+          },
+          {
+            delta: 'Done',
+            output: 'Done',
+            cursor: 3,
+            event_cursor: 2,
+            events: [],
+            done: true,
+          },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should emit compression.started with correct fields preserving casing', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('compression.started', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'compress', session_id: 'sess-comp' })
+        })
+      })
+
+      expect(events).toHaveLength(1)
+      expect(events[0]?.['event']).toBe('compression.started')
+      expect(events[0]?.['session_id']).toBe('sess-comp')
+      expect(events[0]?.['run_id']).toBe('run-1')
+      expect(events[0]?.['request_id']).toBe('comp-1')
+      expect(events[0]?.['message_count']).toBe(42)
+      expect(events[0]?.['token_count']).toBe(128000)
+      expect(events[0]?.['source']).toBe('auto')
+    })
+
+    it('should emit compression.completed with correct fields preserving mixed casing', async () => {
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('compression.completed', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'compress', session_id: 'sess-comp2' })
+        })
+      })
+
+      expect(events).toHaveLength(1)
+      expect(events[0]?.['event']).toBe('compression.completed')
+      expect(events[0]?.['session_id']).toBe('sess-comp2')
+      expect(events[0]?.['run_id']).toBe('run-1')
+      expect(events[0]?.['request_id']).toBe('comp-1')
+      expect(events[0]?.['compressed']).toBe(true)
+      expect(events[0]?.['totalMessages']).toBe(42)
+      expect(events[0]?.['resultMessages']).toBe(8)
+      expect(events[0]?.['beforeTokens']).toBe(128000)
+      expect(events[0]?.['afterTokens']).toBe(24000)
+      expect(events[0]?.['contextTokens']).toBe(200000)
+      expect(events[0]?.['summaryTokens']).toBe(3200)
+    })
+
+    it('should handle compression.started with minimal fields', async () => {
+      client.disconnect()
+      await ioServer.close()
+      await new Promise<void>((resolve) => { httpServer.close(() => { resolve() }) })
+
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'compression.started' }],
+            done: false,
+          },
+          { delta: 'ok', output: 'ok', cursor: 2, event_cursor: 1, events: [], done: true },
+        ],
+      }))
+      connectClient()
+
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('compression.started', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'test', session_id: 'sess-comp-min' })
+        })
+      })
+
+      expect(events[0]?.['event']).toBe('compression.started')
+      expect(events[0]?.['request_id']).toBeUndefined()
+      expect(events[0]?.['message_count']).toBeUndefined()
+      expect(events[0]?.['token_count']).toBeUndefined()
+      expect(events[0]?.['source']).toBeUndefined()
+    })
+
+    it('should handle compression.completed with compressed=false', async () => {
+      client.disconnect()
+      await ioServer.close()
+      await new Promise<void>((resolve) => { httpServer.close(() => { resolve() }) })
+
+      setupServer(createMockBridge({
+        outputs: [
+          {
+            delta: '',
+            output: '',
+            cursor: 1,
+            event_cursor: 1,
+            events: [{ event: 'compression.completed', compressed: false, request_id: 'comp-skip' }],
+            done: false,
+          },
+          { delta: 'ok', output: 'ok', cursor: 2, event_cursor: 1, events: [], done: true },
+        ],
+      }))
+      connectClient()
+
+      const events: Array<Record<string, unknown>> = []
+
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('compression.completed', (d: Record<string, unknown>) => { events.push(d) })
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'test', session_id: 'sess-comp-skip' })
+        })
+      })
+
+      expect(events[0]?.['compressed']).toBe(false)
+      expect(events[0]?.['request_id']).toBe('comp-skip')
+    })
+  })
+
   describe('clarify.respond — socket handler', () => {
     let clarifyRespondCalled: Array<{ clarifyId: string; response: string }>
 
