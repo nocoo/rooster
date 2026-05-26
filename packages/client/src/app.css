@@ -420,6 +420,15 @@ html, body, #app {
   cursor: pointer;
 }
 
+.debug-event-icon {
+  flex-shrink: 0;
+}
+
+.debug-event-time {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .debug-event-payload {
   padding: 8px 12px;
   font-size: 11px;
