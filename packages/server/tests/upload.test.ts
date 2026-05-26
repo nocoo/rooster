@@ -122,6 +122,21 @@ describe('upload routes', () => {
       expect(row.session_id).toBe('sess-1')
     })
 
+    it('should reject non-existent session_id without writing file', async () => {
+      const blob = new Blob(['data'], { type: 'text/plain' })
+      const form = new FormData()
+      form.append('file', new File([blob], 'orphan.txt', { type: 'text/plain' }))
+      form.append('session_id', 'deleted-session')
+      const res = await app.request('/api/upload', { method: 'POST', body: form })
+      expect(res.status).toBe(400)
+      const body = (await res.json()) as { error: string }
+      expect(body.error).toContain('Session not found')
+      const files = readdirSync(uploadsDir)
+      expect(files).toHaveLength(0)
+      const rows = db.prepare('SELECT * FROM attachments').all()
+      expect(rows).toHaveLength(0)
+    })
+
     it('should allow image uploads', async () => {
       const form = createFormData('file', 'fake-png', 'image/png', 'photo.png')
       const res = await app.request('/api/upload', { method: 'POST', body: form })

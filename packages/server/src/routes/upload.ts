@@ -3,9 +3,11 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join, extname } from 'node:path'
 import type { AttachmentStore } from '../services/hermes/attachment-store.js'
+import type { SessionStore } from '../services/hermes/session-store.js'
 
 export interface UploadRouteDeps {
   attachmentStore: AttachmentStore
+  sessionStore: SessionStore
   uploadsDir: string
 }
 
@@ -35,7 +37,7 @@ function safeExtension(originalName: string): string {
 }
 
 export function createUploadRoutes(deps: UploadRouteDeps): Hono {
-  const { attachmentStore, uploadsDir } = deps
+  const { attachmentStore, sessionStore, uploadsDir } = deps
   const routes = new Hono()
 
   routes.post('/', async (c) => {
@@ -53,6 +55,11 @@ export function createUploadRoutes(deps: UploadRouteDeps): Hono {
       return c.json({ error: `Unsupported file type: ${file.type}` }, 415)
     }
 
+    const sessionId = typeof body['session_id'] === 'string' ? body['session_id'] : undefined
+    if (sessionId && !sessionStore.get(sessionId)) {
+      return c.json({ error: 'Session not found' }, 400)
+    }
+
     const ext = safeExtension(file.name)
     const storedName = `${randomUUID()}${ext}`
 
@@ -61,7 +68,6 @@ export function createUploadRoutes(deps: UploadRouteDeps): Hono {
     const buffer = Buffer.from(await file.arrayBuffer())
     await writeFile(filePath, buffer)
 
-    const sessionId = typeof body['session_id'] === 'string' ? body['session_id'] : undefined
     const attachment = attachmentStore.create({
       original_name: file.name,
       stored_name: storedName,

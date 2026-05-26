@@ -26,6 +26,6 @@ export function createApp(deps: AppDeps): Hono {
   app.route('/health', createHealthRoute({ bridge: deps.bridge }))
   app.route('/api/hermes/sessions', createSessionRoutes({ sessionStore, messageStore, bridge: deps.bridge }))
   app.route('/api/hermes', createBridgeRoutes(deps.bridge))
-  app.route('/api/upload', createUploadRoutes({ attachmentStore, uploadsDir }))
+  app.route('/api/upload', createUploadRoutes({ attachmentStore, sessionStore, uploadsDir }))
   return app
 }
