@@ -156,6 +156,41 @@ describe('MessageStore', () => {
     })
   })
 
+  describe('attachments serialization', () => {
+    it('should store and return attachments as JSON', () => {
+      const attachments = [
+        { id: 'att-1', original_name: 'doc.pdf', mime_type: 'application/pdf', size: 2048 },
+        { id: 'att-2', original_name: 'img.png', mime_type: 'image/png', size: 512 },
+      ]
+      const msg = store.append({ session_id: 'sess-1', role: 'user', content: 'see files', attachments })
+      expect(msg.attachments).toEqual(attachments)
+    })
+
+    it('should return null attachments when none provided', () => {
+      const msg = store.append({ session_id: 'sess-1', role: 'user', content: 'no files' })
+      expect(msg.attachments).toBeNull()
+    })
+
+    it('should return null attachments for empty array', () => {
+      const msg = store.append({ session_id: 'sess-1', role: 'user', content: 'empty', attachments: [] })
+      expect(msg.attachments).toBeNull()
+    })
+
+    it('should deserialize attachments in list()', () => {
+      const attachments = [{ id: 'att-x', original_name: 'f.txt', mime_type: 'text/plain', size: 10 }]
+      store.append({ session_id: 'sess-1', role: 'user', content: 'hi', attachments, timestamp: '2025-01-01T00:00:01Z' })
+      const msgs = store.list('sess-1')
+      expect(msgs[0]?.attachments).toEqual(attachments)
+    })
+
+    it('should deserialize attachments in paginate()', () => {
+      const attachments = [{ id: 'att-p', original_name: 'p.pdf', mime_type: 'application/pdf', size: 100 }]
+      store.append({ session_id: 'sess-1', role: 'user', content: 'page', attachments, timestamp: '2025-01-01T00:00:01Z' })
+      const msgs = store.paginate('sess-1')
+      expect(msgs[0]?.attachments).toEqual(attachments)
+    })
+  })
+
   describe('cascade delete', () => {
     it('should delete messages when session is deleted', () => {
       store.append({ session_id: 'sess-1', role: 'user', content: 'hello' })

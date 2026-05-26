@@ -1673,6 +1673,47 @@ describe('Socket.IO /chat-run', () => {
     })
   })
 
+  describe('run — attachments persisted on user message', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge())
+      connectClient()
+    })
+
+    it('should persist attachments on user message when provided', async () => {
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', {
+            input: 'see attached',
+            session_id: 'sess-att',
+            attachments: [
+              { id: 'att-1', original_name: 'doc.pdf', mime_type: 'application/pdf', size: 2048 },
+            ],
+          })
+        })
+      })
+
+      const msgs = messageStore.list('sess-att')
+      expect(msgs[0]?.role).toBe('user')
+      expect(msgs[0]?.attachments).toEqual([
+        { id: 'att-1', original_name: 'doc.pdf', mime_type: 'application/pdf', size: 2048 },
+      ])
+    })
+
+    it('should not set attachments on user message when not provided', async () => {
+      await new Promise<void>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.completed', () => { resolve() })
+          client.emit('run', { input: 'plain', session_id: 'sess-no-att' })
+        })
+      })
+
+      const msgs = messageStore.list('sess-no-att')
+      expect(msgs[0]?.role).toBe('user')
+      expect(msgs[0]?.attachments).toBeNull()
+    })
+  })
+
   describe('clarify.respond — socket handler', () => {
     let clarifyRespondCalled: Array<{ clarifyId: string; response: string }>
 

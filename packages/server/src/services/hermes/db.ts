@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS messages (
   reasoning TEXT,
   reasoning_details TEXT,
   reasoning_content TEXT,
+  attachments TEXT,
   FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 );
 

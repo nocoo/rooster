@@ -39,11 +39,15 @@ export async function executeBridgeRun(
 
   const priorMessages = messageStore.list(sessionId)
 
-  messageStore.append({
+  const userMsgInput: Parameters<typeof messageStore.append>[0] = {
     session_id: sessionId,
     role: 'user',
     content: payload.input,
-  })
+  }
+  if (payload.attachments && payload.attachments.length > 0) {
+    userMsgInput.attachments = payload.attachments
+  }
+  messageStore.append(userMsgInput)
 
   const chatOptions: Record<string, unknown> = { wait: false }
   if (payload.profile) chatOptions['profile'] = payload.profile
