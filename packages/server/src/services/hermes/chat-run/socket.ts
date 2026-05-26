@@ -90,13 +90,16 @@ export function registerChatRunNamespace(io: Server, deps: ChatRunDeps): void {
       }
 
       const messages = deps.messageStore.list(payload.session_id)
+      const runForSession = activeRun !== null && activeRun.sessionId === payload.session_id ? activeRun : null
+      const isWorking = runForSession !== null
+      const isAborting = runForSession !== null && runForSession.abortController.signal.aborted
 
       socket.emit('resumed', {
         event: 'resumed',
         session_id: payload.session_id,
         messages,
-        isWorking: false,
-        isAborting: false,
+        isWorking,
+        isAborting,
         events: [],
       })
     })

@@ -335,6 +335,56 @@ describe('Socket.IO /chat-run', () => {
     })
   })
 
+  describe('resume — active run detection', () => {
+    beforeEach(() => {
+      setupServer(createMockBridge({
+        outputs: [
+          { delta: 'Working', output: 'Working', cursor: 1, event_cursor: 0, events: [], done: false },
+          { delta: '...', output: 'Working...', cursor: 2, event_cursor: 0, events: [], done: false },
+          { delta: '...', output: 'Working......', cursor: 3, event_cursor: 0, events: [], done: false },
+          { delta: '', output: 'Working......', cursor: 4, event_cursor: 0, events: [], done: true },
+        ],
+      }))
+      connectClient()
+    })
+
+    it('should report isWorking=true when resumed session has active run', async () => {
+      const resumed = await new Promise<Record<string, unknown>>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.started', () => {
+            setTimeout(() => {
+              client.emit('resume', { session_id: 'sess-active-run' })
+            }, 30)
+          })
+          client.on('resumed', (d: Record<string, unknown>) => { resolve(d) })
+          client.emit('run', { input: 'long task', session_id: 'sess-active-run' })
+        })
+      })
+
+      expect(resumed['isWorking']).toBe(true)
+      expect(resumed['isAborting']).toBe(false)
+    })
+
+    it('should report isWorking=false when resuming different session', async () => {
+      db.prepare("INSERT INTO sessions (id, started_at, last_active) VALUES (?, ?, ?)").run('sess-other', '2025-01-01', '2025-01-01')
+
+      const resumed = await new Promise<Record<string, unknown>>((resolve) => {
+        client.on('connect', () => {
+          client.on('run.started', () => {
+            setTimeout(() => {
+              client.emit('resume', { session_id: 'sess-other' })
+            }, 30)
+          })
+          client.on('resumed', (d: Record<string, unknown>) => { resolve(d) })
+          client.emit('run', { input: 'long task', session_id: 'sess-active-run-2' })
+        })
+      })
+
+      expect(resumed['isWorking']).toBe(false)
+      expect(resumed['isAborting']).toBe(false)
+    })
+  })
+
   describe('run — new session creation', () => {
     beforeEach(() => {
       setupServer(createMockBridge())
