@@ -24,9 +24,12 @@ describe('HeaderSettings', () => {
     cleanup()
   })
 
-  it('should render nothing when no profiles or models', () => {
-    const { container } = render(<HeaderSettings />)
-    expect(container.querySelectorAll('select')).toHaveLength(0)
+  it('should render selectors with only default options when lists are empty', () => {
+    render(<HeaderSettings />)
+    expect(screen.getByLabelText('Profile')).toBeTruthy()
+    expect(screen.getByLabelText('Model')).toBeTruthy()
+    expect(screen.getByText('Default profile')).toBeTruthy()
+    expect(screen.getByText('Default model')).toBeTruthy()
   })
 
   it('should render profile selector when profiles available', () => {
