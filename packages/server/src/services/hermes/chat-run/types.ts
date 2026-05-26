@@ -1,3 +1,10 @@
+export interface AttachmentRef {
+  id: string
+  original_name: string
+  mime_type: string
+  size: number
+}
+
 export interface RunPayload {
   input: string
   session_id?: string
@@ -11,6 +18,7 @@ export interface RunPayload {
   model_groups?: string[]
   queue_id?: string
   source?: string
+  attachments?: AttachmentRef[]
 }
 
 export interface AbortPayload {

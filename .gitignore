@@ -11,3 +11,6 @@ pnpm-lock.yaml
 *.db
 *.db-shm
 *.db-wal
+
+# Upload storage
+uploads/
