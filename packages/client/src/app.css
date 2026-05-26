@@ -538,3 +538,35 @@ html, body, #app {
     width: 100vw;
   }
 }
+
+/* Approval/Clarify dialogs */
+.approval-dialog,
+.clarify-dialog {
+  margin: 0.75rem 0;
+  border: 1px solid var(--borderColor-default, var(--color-border-default));
+  border-radius: 6px;
+}
+
+.approval-command {
+  padding: 0.5rem;
+  background: var(--bgColor-muted, var(--color-canvas-subtle));
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.clarify-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.clarify-input {
+  display: flex;
+  align-items: center;
+}

@@ -1,9 +1,11 @@
 import { messages, loading, activeSession } from '../state/sessions.js'
-import { isStreamingHere, chatError } from '../state/chat.js'
+import { isStreamingHere, chatError, pendingApproval, pendingClarify } from '../state/chat.js'
 import { ChatInput } from './ChatInput.js'
 import { StreamingMessage } from './StreamingMessage.js'
 import { ToolTrace } from './ToolTrace.js'
 import { AgentStatusBar } from './AgentStatusBar.js'
+import { ApprovalDialog } from './ApprovalDialog.js'
+import { ClarifyDialog } from './ClarifyDialog.js'
 import { Markdown } from './Markdown.js'
 import { ReasoningBlock } from './ReasoningBlock.js'
 
@@ -68,6 +70,8 @@ export function MessageHistory() {
             <StreamingMessage />
           </>
         )}
+        {pendingApproval.value && <ApprovalDialog />}
+        {pendingClarify.value && <ClarifyDialog />}
         {chatError.value && (
           <div class="message-bubble message-bubble--error">
             <div class="message-meta">

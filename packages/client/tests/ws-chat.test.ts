@@ -30,7 +30,7 @@ vi.mock('socket.io-client', () => ({
   io: vi.fn(() => mockSocket),
 }))
 
-import { connected, connect, disconnect, sendRun, sendAbort, sendResume, setHandlers, getSocket } from '../src/ws/chat.js'
+import { connected, connect, disconnect, sendRun, sendAbort, sendResume, sendApprovalRespond, sendClarifyRespond, setHandlers, getSocket } from '../src/ws/chat.js'
 
 describe('ws/chat', () => {
   beforeEach(() => {
@@ -52,6 +52,10 @@ describe('ws/chat', () => {
       expect(mockSocket._listeners.has('thinking.delta')).toBe(true)
       expect(mockSocket._listeners.has('reasoning.available')).toBe(true)
       expect(mockSocket._listeners.has('agent.event')).toBe(true)
+      expect(mockSocket._listeners.has('approval.requested')).toBe(true)
+      expect(mockSocket._listeners.has('approval.resolved')).toBe(true)
+      expect(mockSocket._listeners.has('clarify.requested')).toBe(true)
+      expect(mockSocket._listeners.has('clarify.resolved')).toBe(true)
       expect(mockSocket._listeners.has('resumed')).toBe(true)
     })
 
@@ -184,6 +188,22 @@ describe('ws/chat', () => {
       connect()
       sendResume('s1')
       expect(mockSocket.emit).toHaveBeenCalledWith('resume', { session_id: 's1' })
+    })
+  })
+
+  describe('sendApprovalRespond', () => {
+    it('should emit approval.respond event', () => {
+      connect()
+      sendApprovalRespond('s1', 'apr-1', 'allow')
+      expect(mockSocket.emit).toHaveBeenCalledWith('approval.respond', { session_id: 's1', approval_id: 'apr-1', choice: 'allow' })
+    })
+  })
+
+  describe('sendClarifyRespond', () => {
+    it('should emit clarify.respond event', () => {
+      connect()
+      sendClarifyRespond('s1', 'clr-1', 'my answer')
+      expect(mockSocket.emit).toHaveBeenCalledWith('clarify.respond', { session_id: 's1', clarify_id: 'clr-1', response: 'my answer' })
     })
   })
 
