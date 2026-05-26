@@ -39,7 +39,7 @@ describe('SessionList', () => {
 
     render(<SessionList />)
     expect(screen.getByText('First Session')).toBeTruthy()
-    expect(screen.getByText('s2'.slice(0, 8))).toBeTruthy()
+    expect(screen.getByText('Chat s2')).toBeTruthy()
   })
 
   it('should navigate to /session/:id on click', () => {
@@ -59,7 +59,7 @@ describe('SessionList', () => {
     activeSessionId.value = 's1'
 
     const { container } = render(<SessionList />)
-    const activeItem = container.querySelector('.ActionList-item--navActive')
+    const activeItem = container.querySelector('.session-item--active')
     expect(activeItem).toBeTruthy()
   })
 

@@ -13,28 +13,23 @@ function ChatPage({ id }: { path: string; id?: string }) {
     if (id) setActiveSession(id)
   }, [id])
 
-  return (
-    <div class="flex-1 d-flex flex-column overflow-hidden">
-      <MessageHistory />
-    </div>
-  )
+  return <MessageHistory />
 }
 
 function HomePage(_props: { path: string }) {
   if (activeSessionId.value) {
-    return (
-      <div class="flex-1 d-flex flex-column overflow-hidden">
-        <MessageHistory />
-      </div>
-    )
+    return <MessageHistory />
   }
 
   return (
-    <div class="flex-1 d-flex flex-column overflow-hidden">
-      <div class="d-flex align-items-center justify-content-center flex-1 color-fg-muted">
+    <div class="app-chat">
+      <div class="chat-welcome">
+        <h2>Rooster</h2>
         <p>Start a new conversation</p>
       </div>
-      <ChatInput />
+      <div class="chat-input-area">
+        <ChatInput />
+      </div>
     </div>
   )
 }
@@ -47,7 +42,7 @@ export function App({ url }: { url?: string }) {
   }, [])
 
   return (
-    <div class="d-flex flex-column height-full">
+    <div class="app-layout">
       <header class="Header">
         <div class="Header-item">
           <a class="Header-link f4 text-bold" href="/">Rooster</a>
@@ -57,15 +52,15 @@ export function App({ url }: { url?: string }) {
           <HeaderSettings />
         </div>
       </header>
-      <main class="d-flex flex-1 overflow-hidden">
-        <nav class="border-right" style={{ width: '260px', overflowY: 'auto' }}>
+      <div class="app-main">
+        <nav class="app-sidebar">
           <SessionList />
         </nav>
         <Router {...(url ? { url } : {})}>
           <HomePage path="/" />
           <ChatPage path="/session/:id" />
         </Router>
-      </main>
+      </div>
     </div>
   )
 }

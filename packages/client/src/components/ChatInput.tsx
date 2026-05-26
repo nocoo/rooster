@@ -29,16 +29,17 @@ export function ChatInput() {
   const isAborting = aborting.value
 
   return (
-    <form class="border-top p-3" onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit}>
       <div class="d-flex gap-2">
         <textarea
           ref={inputRef}
           class="form-control flex-1"
           placeholder="Send a message…"
-          rows={2}
+          rows={3}
           disabled={isStreaming}
           onKeyDown={handleKeyDown}
           aria-label="Message input"
+          style={{ resize: 'none' }}
         />
         {isStreaming ? (
           <button

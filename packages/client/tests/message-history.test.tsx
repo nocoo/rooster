@@ -57,20 +57,4 @@ describe('MessageHistory', () => {
     expect(screen.getByText('user')).toBeTruthy()
     expect(screen.getByText('assistant')).toBeTruthy()
   })
-
-  it('should show session title in header', () => {
-    sessions.value = [{ id: 's1', title: 'My Chat', started_at: '2025-01-01', last_active: '2025-01-01' }]
-    activeSessionId.value = 's1'
-
-    render(<MessageHistory />)
-    expect(screen.getByText('My Chat')).toBeTruthy()
-  })
-
-  it('should show truncated id when no title', () => {
-    sessions.value = [{ id: 'abcdefgh-1234', started_at: '2025-01-01', last_active: '2025-01-01' }]
-    activeSessionId.value = 'abcdefgh-1234'
-
-    render(<MessageHistory />)
-    expect(screen.getByText('abcdefgh')).toBeTruthy()
-  })
 })

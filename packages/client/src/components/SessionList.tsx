@@ -11,48 +11,39 @@ export function SessionList() {
   const activeId = activeSessionId.value
 
   return (
-    <div class="p-2">
-      <div class="d-flex flex-items-center flex-justify-between mb-2 px-2">
-        <h3 class="f5 text-bold">Sessions</h3>
+    <div class="p-3">
+      <div class="d-flex flex-items-center flex-justify-between mb-3">
+        <span class="text-bold f5">Sessions</span>
         <button class="btn btn-sm btn-primary" type="button" onClick={startNewChat}>
-          New
+          New Chat
         </button>
       </div>
       {items.length === 0 && (
-        <p class="color-fg-muted f6 px-2">No sessions yet</p>
+        <p class="color-fg-muted f6">No sessions yet</p>
       )}
-      <ul class="ActionList">
-        {items.map((session) => (
-          <li
-            key={session.id}
-            class={`ActionList-item${session.id === activeId ? ' ActionList-item--navActive' : ''}`}
+      {items.map((session) => (
+        <div
+          key={session.id}
+          class={`session-item${session.id === activeId ? ' session-item--active' : ''}`}
+          onClick={() => { route(`/session/${session.id}`) }}
+        >
+          <span class="session-item-label">
+            {session.title ?? `Chat ${session.id.slice(0, 8)}`}
+          </span>
+          <span class="session-item-time">{formatDate(session.last_active)}</span>
+          <button
+            class="session-item-delete"
+            type="button"
+            aria-label="Delete session"
+            onClick={(e) => {
+              e.stopPropagation()
+              void removeSession(session.id)
+            }}
           >
-            <button
-              class="ActionList-content"
-              type="button"
-              onClick={() => { route(`/session/${session.id}`) }}
-            >
-              <span class="ActionList-item-label text-truncate">
-                {session.title ?? session.id.slice(0, 8)}
-              </span>
-              <span class="ActionList-item-description color-fg-muted f6">
-                {formatDate(session.last_active)}
-              </span>
-            </button>
-            <button
-              class="ActionList-item-action btn-octicon"
-              type="button"
-              aria-label="Delete session"
-              onClick={(e) => {
-                e.stopPropagation()
-                void removeSession(session.id)
-              }}
-            >
-              ×
-            </button>
-          </li>
-        ))}
-      </ul>
+            &times;
+          </button>
+        </div>
+      ))}
     </div>
   )
 }
