@@ -29,6 +29,10 @@ vi.mock('../src/api/settings.js', () => ({
   fetchProviders: vi.fn().mockResolvedValue([]),
 }))
 
+vi.mock('../src/api/health.js', () => ({
+  fetchHealth: vi.fn().mockResolvedValue({ status: 'ok', timestamp: '', bridge: 'connected' }),
+}))
+
 vi.mock('socket.io-client', () => ({
   io: vi.fn(() => ({ on: vi.fn(), emit: vi.fn(), disconnect: vi.fn() })),
 }))

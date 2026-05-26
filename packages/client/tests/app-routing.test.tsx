@@ -25,6 +25,10 @@ vi.mock('../src/api/settings.js', () => ({
   fetchProviders: vi.fn().mockResolvedValue([]),
 }))
 
+vi.mock('../src/api/health.js', () => ({
+  fetchHealth: vi.fn().mockResolvedValue({ status: 'ok', timestamp: '', bridge: 'connected' }),
+}))
+
 describe('App routing integration', () => {
   beforeEach(() => {
     activeSessionId.value = null
