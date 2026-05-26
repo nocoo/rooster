@@ -20,6 +20,7 @@ import {
   type ResumedPayload,
 } from '../ws/chat.js'
 import { sessions, sessionsTotal, activeSessionId, messages, loadSessions } from './sessions.js'
+import { pushDebugEvent } from './debug.js'
 import type { Message } from '../types.js'
 
 export interface AgentStatus {
@@ -111,16 +112,19 @@ function isActiveSession(sessionId: string): boolean {
 }
 
 function handleRunStarted(payload: RunStartedPayload): void {
+  pushDebugEvent('run.started', payload)
   if (!isActiveSession(payload.session_id)) return
   currentRunId.value = payload.run_id
 }
 
 function handleMessageDelta(payload: MessageDeltaPayload): void {
+  pushDebugEvent('message.delta', payload)
   if (!isActiveSession(payload.session_id)) return
   streamOutput.value = payload.output
 }
 
 function handleRunCompleted(payload: RunCompletedPayload): void {
+  pushDebugEvent('run.completed', payload)
   if (!isActiveSession(payload.session_id)) return
 
   const finalOutput = payload.output || streamOutput.value
@@ -147,6 +151,7 @@ function handleRunCompleted(payload: RunCompletedPayload): void {
 }
 
 function handleRunFailed(payload: RunFailedPayload): void {
+  pushDebugEvent('run.failed', payload)
   if (!isActiveSession(payload.session_id)) return
   chatError.value = payload.error
 
@@ -168,6 +173,7 @@ function handleRunFailed(payload: RunFailedPayload): void {
 }
 
 function handleToolStarted(payload: ToolStartedPayload): void {
+  pushDebugEvent('tool.started', payload)
   if (!isActiveSession(payload.session_id)) return
   const evt: ToolEvent = {
     tool_call_id: payload.tool_call_id,
@@ -180,6 +186,7 @@ function handleToolStarted(payload: ToolStartedPayload): void {
 }
 
 function handleToolCompleted(payload: ToolCompletedPayload): void {
+  pushDebugEvent('tool.completed', payload)
   if (!isActiveSession(payload.session_id)) return
   toolEvents.value = toolEvents.value.map((t) =>
     t.tool_call_id === payload.tool_call_id
@@ -195,6 +202,7 @@ function handleToolCompleted(payload: ToolCompletedPayload): void {
 }
 
 function handleAbortCompleted(payload: AbortCompletedPayload): void {
+  pushDebugEvent('abort.completed', payload)
   if (!isActiveSession(payload.session_id)) return
   streaming.value = false
   aborting.value = false
@@ -202,21 +210,25 @@ function handleAbortCompleted(payload: AbortCompletedPayload): void {
 }
 
 function handleReasoningDelta(payload: ReasoningDeltaPayload): void {
+  pushDebugEvent('reasoning.delta', payload)
   if (!isActiveSession(payload.session_id)) return
   reasoningText.value += payload.text
 }
 
 function handleThinkingDelta(payload: ThinkingDeltaPayload): void {
+  pushDebugEvent('thinking.delta', payload)
   if (!isActiveSession(payload.session_id)) return
   reasoningText.value += payload.text
 }
 
 function handleReasoningAvailable(payload: ReasoningAvailablePayload): void {
+  pushDebugEvent('reasoning.available', payload)
   if (!isActiveSession(payload.session_id)) return
   reasoningDone.value = true
 }
 
 function handleAgentEvent(payload: AgentEventPayload): void {
+  pushDebugEvent('agent.event', payload)
   if (!isActiveSession(payload.session_id)) return
   const profile = payload['profile']
   const model = payload['model']
@@ -233,6 +245,7 @@ function handleAgentEvent(payload: AgentEventPayload): void {
 }
 
 function handleResumed(payload: ResumedPayload): void {
+  pushDebugEvent('resumed', payload)
   if (!isActiveSession(payload.session_id)) return
 
   if (Array.isArray(payload.messages) && payload.messages.length > 0) {

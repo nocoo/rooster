@@ -1,0 +1,42 @@
+import { describe, it, expect, beforeEach } from 'vitest'
+import { debugEnabled, debugEvents, toggleDebug, pushDebugEvent, clearDebugEvents } from '../src/state/debug.js'
+
+describe('debug state', () => {
+  beforeEach(() => {
+    debugEnabled.value = false
+    debugEvents.value = []
+  })
+
+  it('should default to disabled', () => {
+    expect(debugEnabled.value).toBe(false)
+  })
+
+  it('should toggle debug mode', () => {
+    toggleDebug()
+    expect(debugEnabled.value).toBe(true)
+    toggleDebug()
+    expect(debugEnabled.value).toBe(false)
+  })
+
+  it('should not push events when disabled', () => {
+    pushDebugEvent('test.event', { foo: 'bar' })
+    expect(debugEvents.value).toHaveLength(0)
+  })
+
+  it('should push events when enabled', () => {
+    debugEnabled.value = true
+    pushDebugEvent('test.event', { foo: 'bar' })
+    expect(debugEvents.value).toHaveLength(1)
+    expect(debugEvents.value[0]?.event).toBe('test.event')
+    expect(debugEvents.value[0]?.payload).toEqual({ foo: 'bar' })
+  })
+
+  it('should clear events', () => {
+    debugEnabled.value = true
+    pushDebugEvent('a', {})
+    pushDebugEvent('b', {})
+    expect(debugEvents.value).toHaveLength(2)
+    clearDebugEvents()
+    expect(debugEvents.value).toHaveLength(0)
+  })
+})

@@ -5,9 +5,11 @@ import { SessionList } from '../components/SessionList.js'
 import { MessageHistory } from '../components/MessageHistory.js'
 import { ChatInput } from '../components/ChatInput.js'
 import { HeaderSettings } from '../components/HeaderSettings.js'
+import { DebugPanel } from '../components/DebugPanel.js'
 import { loadSessions, setActiveSession, activeSessionId } from '../state/sessions.js'
 import { initChat } from '../state/chat.js'
 import { loadSettings } from '../state/settings.js'
+import { debugEnabled, toggleDebug } from '../state/debug.js'
 
 function getInitialColorMode(): 'light' | 'dark' {
   try {
@@ -74,6 +76,16 @@ export function App({ url }: { url?: string }) {
         <div class="app-header-right">
           <button
             type="button"
+            class={`btn-octicon${debugEnabled.value ? ' btn-octicon--active' : ''}`}
+            aria-label="Toggle debug panel"
+            onClick={toggleDebug}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M4.72.22a.75.75 0 0 1 1.06 0l1 1a.75.75 0 0 1-1.06 1.06l-.22-.22A3.98 3.98 0 0 0 4 5.75v.5h3.25a.75.75 0 0 1 0 1.5H4v.5c0 .57.12 1.11.34 1.6l2.72-2.72a.75.75 0 0 1 1.06 1.06L5.56 10.7A4 4 0 0 0 8 12h.25v-1.25a.75.75 0 0 1 1.5 0V12H10a4 4 0 0 0 2.44-1.3l-2.56-2.56a.75.75 0 0 1 1.06-1.06l2.72 2.72c.22-.49.34-1.03.34-1.6v-.5h-3.25a.75.75 0 0 1 0-1.5H14v-.5a3.98 3.98 0 0 0-1.5-3.11l-.22.22a.75.75 0 0 1-1.06-1.06l1-1a.75.75 0 0 1 1.06 0l.22.22A5.5 5.5 0 0 1 15.5 5.75v2.5a5.5 5.5 0 0 1-5.5 5.5h-.25v1.5a.75.75 0 0 1-1.5 0v-1.5H8a5.5 5.5 0 0 1-5.5-5.5v-2.5A5.5 5.5 0 0 1 4.5.44l.22-.22Z" />
+            </svg>
+          </button>
+          <button
+            type="button"
             class="btn-octicon"
             aria-label="Toggle color mode"
             onClick={toggleColorMode}
@@ -94,10 +106,13 @@ export function App({ url }: { url?: string }) {
         <nav class="app-sidebar">
           <SessionList />
         </nav>
-        <Router {...(url ? { url } : {})}>
-          <HomePage path="/" />
-          <ChatPage path="/session/:id" />
-        </Router>
+        <div class="app-content">
+          <Router {...(url ? { url } : {})}>
+            <HomePage path="/" />
+            <ChatPage path="/session/:id" />
+          </Router>
+          <DebugPanel />
+        </div>
       </div>
     </div>
   )

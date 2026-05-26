@@ -368,6 +368,67 @@ html, body, #app {
   color: var(--fgColor-default, var(--color-fg-default));
 }
 
+.btn-octicon--active {
+  background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
+  color: var(--fgColor-default, var(--color-fg-default));
+}
+
+/* App content wrapper */
+.app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Debug panel */
+.debug-panel {
+  border-top: 1px solid var(--borderColor-default, var(--color-border-default));
+  max-height: 240px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.debug-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--borderColor-default, var(--color-border-default));
+  background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
+}
+
+.debug-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.debug-event-item {
+  border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));
+}
+
+.debug-event-item summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.debug-event-payload {
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
+  margin: 0;
+}
+
 /* Input area fix */
 .chat-input-area .d-flex {
   gap: 12px;
