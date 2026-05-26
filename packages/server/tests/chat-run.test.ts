@@ -557,6 +557,10 @@ describe('Socket.IO /chat-run', () => {
       expect(events[0]?.['event']).toBe('run.failed')
       expect(events[0]?.['error']).toBe('rate limit exceeded')
       expect(events[0]?.['output']).toBe('partial')
+
+      const msgs = messageStore.list('sess-fail')
+      expect(msgs).toHaveLength(1)
+      expect(msgs[0]?.role).toBe('user')
     })
   })
 
@@ -589,6 +593,10 @@ describe('Socket.IO /chat-run', () => {
 
       expect(failed['event']).toBe('run.failed')
       expect(failed['error']).toBe('Task could not be completed')
+
+      const msgs = messageStore.list('sess-result-fail')
+      expect(msgs).toHaveLength(1)
+      expect(msgs[0]?.role).toBe('user')
     })
   })
 

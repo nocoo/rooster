@@ -93,14 +93,6 @@ export async function executeBridgeRun(
 
       const terminalError = detectTerminalError(chunk)
 
-      messageStore.append({
-        session_id: sessionId,
-        role: 'assistant',
-        content: output,
-      })
-
-      sessionStore.updateLastActive(sessionId)
-
       if (terminalError) {
         emitter.emit('run.failed', {
           event: 'run.failed',
@@ -110,6 +102,13 @@ export async function executeBridgeRun(
           output,
         })
       } else {
+        messageStore.append({
+          session_id: sessionId,
+          role: 'assistant',
+          content: output,
+        })
+        sessionStore.updateLastActive(sessionId)
+
         emitter.emit('run.completed', {
           event: 'run.completed',
           session_id: sessionId,

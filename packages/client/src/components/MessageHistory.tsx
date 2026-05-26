@@ -3,6 +3,7 @@ import { streaming, chatError } from '../state/chat.js'
 import { ChatInput } from './ChatInput.js'
 import { StreamingMessage } from './StreamingMessage.js'
 import { ToolTrace } from './ToolTrace.js'
+import { AgentStatusBar } from './AgentStatusBar.js'
 
 export function MessageHistory() {
   const msgs = messages.value
@@ -51,6 +52,7 @@ export function MessageHistory() {
         ))}
         {streaming.value && (
           <>
+            <AgentStatusBar />
             <ToolTrace />
             <StreamingMessage />
           </>

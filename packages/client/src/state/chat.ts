@@ -22,6 +22,15 @@ import {
 import { sessions, sessionsTotal, activeSessionId, messages, loadSessions } from './sessions.js'
 import type { Message } from '../types.js'
 
+export interface AgentStatus {
+  type: string
+  profile?: string
+  model?: string
+  provider?: string
+  tool_count?: number
+  [key: string]: unknown
+}
+
 export const streaming = signal(false)
 export const aborting = signal(false)
 export const currentRunId = signal<string | null>(null)
@@ -29,6 +38,7 @@ export const streamOutput = signal('')
 export const reasoningText = signal('')
 export const reasoningDone = signal(false)
 export const toolEvents = signal<ToolEvent[]>([])
+export const agentEvents = signal<AgentStatus[]>([])
 export const chatError = signal<string | null>(null)
 
 export const isWorking = computed(() => streaming.value || aborting.value)
@@ -79,6 +89,7 @@ export function send(input: string, opts?: { model?: string; profile?: string; p
   reasoningText.value = ''
   reasoningDone.value = false
   toolEvents.value = []
+  agentEvents.value = []
 
   const payload: Record<string, string> = { input, session_id: sessionId }
   if (opts?.model) payload['model'] = opts.model
@@ -130,6 +141,7 @@ function handleRunCompleted(payload: RunCompletedPayload): void {
   reasoningText.value = ''
   reasoningDone.value = false
   toolEvents.value = []
+  agentEvents.value = []
 
   void loadSessions()
 }
@@ -182,7 +194,8 @@ function handleToolCompleted(payload: ToolCompletedPayload): void {
   )
 }
 
-function handleAbortCompleted(_payload: AbortCompletedPayload): void {
+function handleAbortCompleted(payload: AbortCompletedPayload): void {
+  if (!isActiveSession(payload.session_id)) return
   streaming.value = false
   aborting.value = false
   currentRunId.value = null
@@ -203,8 +216,20 @@ function handleReasoningAvailable(payload: ReasoningAvailablePayload): void {
   reasoningDone.value = true
 }
 
-function handleAgentEvent(_payload: AgentEventPayload): void {
-  // Reserved for future status display
+function handleAgentEvent(payload: AgentEventPayload): void {
+  if (!isActiveSession(payload.session_id)) return
+  const profile = payload['profile']
+  const model = payload['model']
+  const provider = payload['provider']
+  const toolCount = payload['tool_count']
+  const status: AgentStatus = {
+    type: payload.type,
+    ...(typeof profile === 'string' ? { profile } : {}),
+    ...(typeof model === 'string' ? { model } : {}),
+    ...(typeof provider === 'string' ? { provider } : {}),
+    ...(typeof toolCount === 'number' ? { tool_count: toolCount } : {}),
+  }
+  agentEvents.value = [...agentEvents.value, status]
 }
 
 function handleResumed(payload: ResumedPayload): void {

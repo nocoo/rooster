@@ -7,6 +7,7 @@ import {
   reasoningText,
   reasoningDone,
   toolEvents,
+  agentEvents,
   chatError,
   isWorking,
   initChat,
@@ -48,6 +49,7 @@ describe('state/chat', () => {
     reasoningText.value = ''
     reasoningDone.value = false
     toolEvents.value = []
+    agentEvents.value = []
     chatError.value = null
     activeSessionId.value = null
     sessions.value = []
@@ -343,6 +345,7 @@ describe('state/chat', () => {
     })
 
     it('handleAbortCompleted should reset streaming state', () => {
+      activeSessionId.value = 's1'
       const h = getHandlers()
       streaming.value = true
       aborting.value = true
@@ -351,6 +354,18 @@ describe('state/chat', () => {
       expect(streaming.value).toBe(false)
       expect(aborting.value).toBe(false)
       expect(currentRunId.value).toBeNull()
+    })
+
+    it('handleAbortCompleted should ignore different session', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      streaming.value = true
+      aborting.value = true
+      currentRunId.value = 'r1'
+      h['onAbortCompleted']({ event: 'abort.completed', session_id: 'other', run_id: 'r1', synced: true })
+      expect(streaming.value).toBe(true)
+      expect(aborting.value).toBe(true)
+      expect(currentRunId.value).toBe('r1')
     })
 
     it('handleReasoningDelta should append text', () => {
@@ -395,6 +410,41 @@ describe('state/chat', () => {
       const h = getHandlers()
       h['onReasoningAvailable']({ event: 'reasoning.available', session_id: 'other', run_id: 'r1' })
       expect(reasoningDone.value).toBe(false)
+    })
+
+    it('handleAgentEvent should add status to agentEvents', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onAgentEvent']({
+        event: 'agent.event', session_id: 's1', run_id: 'r1', type: 'status',
+        profile: 'default', model: 'claude-4', provider: 'anthropic', tool_count: 30,
+      })
+      expect(agentEvents.value).toHaveLength(1)
+      expect(agentEvents.value[0]?.type).toBe('status')
+      expect(agentEvents.value[0]?.profile).toBe('default')
+      expect(agentEvents.value[0]?.model).toBe('claude-4')
+      expect(agentEvents.value[0]?.provider).toBe('anthropic')
+      expect(agentEvents.value[0]?.tool_count).toBe(30)
+    })
+
+    it('handleAgentEvent should ignore different session', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onAgentEvent']({
+        event: 'agent.event', session_id: 'other', run_id: 'r1', type: 'status',
+      })
+      expect(agentEvents.value).toHaveLength(0)
+    })
+
+    it('handleAgentEvent should handle minimal payload without optional fields', () => {
+      activeSessionId.value = 's1'
+      const h = getHandlers()
+      h['onAgentEvent']({
+        event: 'agent.event', session_id: 's1', run_id: 'r1', type: 'unknown_event',
+      })
+      expect(agentEvents.value).toHaveLength(1)
+      expect(agentEvents.value[0]?.type).toBe('unknown_event')
+      expect(agentEvents.value[0]?.profile).toBeUndefined()
     })
 
     it('handleResumed should restore messages and working state', () => {
@@ -448,12 +498,18 @@ describe('state/chat', () => {
     })
 
     describe('full event sequence simulation', () => {
-      it('should handle thinking → tool → message → completed', () => {
+      it('should handle agent.event → thinking → tool → message → completed', () => {
         activeSessionId.value = 's1'
         const h = getHandlers()
 
         h['onRunStarted']({ event: 'run.started', session_id: 's1', run_id: 'r1', queue_length: 0 })
         expect(currentRunId.value).toBe('r1')
+
+        h['onAgentEvent']({
+          event: 'agent.event', session_id: 's1', run_id: 'r1', type: 'status',
+          profile: 'coding', model: 'claude-4', provider: 'anthropic', tool_count: 25,
+        })
+        expect(agentEvents.value).toHaveLength(1)
 
         h['onThinkingDelta']({ event: 'thinking.delta', session_id: 's1', run_id: 'r1', text: 'Let me think...' })
         expect(reasoningText.value).toBe('Let me think...')
@@ -479,6 +535,7 @@ describe('state/chat', () => {
         expect(messages.value[0]?.content).toBe('Here are files.')
         expect(streaming.value).toBe(false)
         expect(toolEvents.value).toHaveLength(0)
+        expect(agentEvents.value).toHaveLength(0)
         expect(reasoningText.value).toBe('')
       })
 
@@ -495,6 +552,11 @@ describe('state/chat', () => {
           tool_call_id: 'tc-x', tool: 'Bash', name: 'Bash', arguments: '{}',
         })
         expect(toolEvents.value).toHaveLength(0)
+
+        h['onAgentEvent']({
+          event: 'agent.event', session_id: 'other', run_id: 'r2', type: 'status',
+        })
+        expect(agentEvents.value).toHaveLength(0)
 
         h['onRunCompleted']({ event: 'run.completed', session_id: 'other', run_id: 'r2', output: 'other output' })
         expect(streaming.value).toBe(true)
