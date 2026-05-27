@@ -11,6 +11,7 @@
     "rebuild:native": "tsx scripts/ensure-native.ts",
     "test": "bun run rebuild:native && vitest run",
     "test:coverage": "bun run rebuild:native && vitest run --coverage",
+    "test:e2e": "bun run rebuild:native && vitest run -c packages/server/vitest.e2e.config.ts",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p packages/server --noEmit && tsc -p packages/client --noEmit && tsc --noEmit",
     "gate:security": "tsx scripts/run-security.ts",
