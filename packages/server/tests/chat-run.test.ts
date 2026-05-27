@@ -5,6 +5,7 @@ import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client'
 import { createDb } from '../src/services/hermes/db.js'
 import { SessionStore } from '../src/services/hermes/session-store.js'
 import { MessageStore } from '../src/services/hermes/message-store.js'
+import { AttachmentStore } from '../src/services/hermes/attachment-store.js'
 import { registerChatRunNamespace } from '../src/services/hermes/chat-run/socket.js'
 import type { AgentBridgeClient, AgentBridgeChatStarted, AgentBridgeOutput, AgentBridgeResponse } from '../src/services/hermes/agent-bridge.js'
 import type Database from 'better-sqlite3'
@@ -1674,12 +1675,44 @@ describe('Socket.IO /chat-run', () => {
   })
 
   describe('run — attachments persisted on user message', () => {
-    beforeEach(() => {
-      setupServer(createMockBridge())
+    let attStore: AttachmentStore
+    let uploadsDir: string
+
+    beforeEach(async () => {
+      const { mkdtemp } = await import('node:fs/promises')
+      const { tmpdir } = await import('node:os')
+      const { join } = await import('node:path')
+
+      db = createDb(':memory:')
+      sessionStore = new SessionStore(db)
+      messageStore = new MessageStore(db)
+      attStore = new AttachmentStore(db)
+      uploadsDir = await mkdtemp(join(tmpdir(), 'rooster-chat-run-test-'))
+      httpServer = createServer()
+      ioServer = new Server(httpServer)
+      registerChatRunNamespace(ioServer, { bridge: createMockBridge(), sessionStore, messageStore, attachmentStore: attStore, uploadsDir })
+      httpServer.listen(0)
+      port = (httpServer.address() as AddressInfo).port
       connectClient()
     })
 
     it('should persist attachments on user message when provided', async () => {
+      const { writeFile } = await import('node:fs/promises')
+      const { join } = await import('node:path')
+
+      const storedName = 'att-file.pdf'
+      await writeFile(join(uploadsDir, storedName), Buffer.from('%PDF'))
+      sessionStore.create({ id: 'sess-att' })
+      attStore.create({
+        session_id: 'sess-att',
+        original_name: 'doc.pdf',
+        stored_name: storedName,
+        mime_type: 'application/pdf',
+        size: 2048,
+      })
+      const att = attStore.listBySession('sess-att')[0]
+      const attId = att?.id ?? ''
+
       await new Promise<void>((resolve) => {
         client.on('connect', () => {
           client.on('run.completed', () => { resolve() })
@@ -1687,7 +1720,7 @@ describe('Socket.IO /chat-run', () => {
             input: 'see attached',
             session_id: 'sess-att',
             attachments: [
-              { id: 'att-1', original_name: 'doc.pdf', mime_type: 'application/pdf', size: 2048 },
+              { id: attId, original_name: 'doc.pdf', mime_type: 'application/pdf', size: 2048 },
             ],
           })
         })
@@ -1696,7 +1729,7 @@ describe('Socket.IO /chat-run', () => {
       const msgs = messageStore.list('sess-att')
       expect(msgs[0]?.role).toBe('user')
       expect(msgs[0]?.attachments).toEqual([
-        { id: 'att-1', original_name: 'doc.pdf', mime_type: 'application/pdf', size: 2048 },
+        { id: attId, original_name: 'doc.pdf', mime_type: 'application/pdf', size: 2048 },
       ])
     })
 

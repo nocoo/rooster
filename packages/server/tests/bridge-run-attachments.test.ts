@@ -262,6 +262,10 @@ describe('executeBridgeRun — attachments', () => {
     )
 
     expect(captured.value).toBe('show me')
+
+    const stored = messageStore.list('sess-B')
+    const userMsg = stored.find((m) => m.role === 'user')
+    expect(userMsg?.attachments).toBeNull()
   })
 
   it('should bind pending attachment (session_id=null) to current session and inject', async () => {
@@ -300,9 +304,14 @@ describe('executeBridgeRun — attachments', () => {
     expect(msg[1]).toMatchObject({ type: 'text', text: 'process this' })
 
     expect(attachmentStore.get(attachment.id)?.session_id).toBe('sess-new')
+
+    const stored = messageStore.list('sess-new')
+    const userMsg = stored.find((m) => m.role === 'user')
+    expect(userMsg?.attachments).toHaveLength(1)
+    expect(userMsg?.attachments?.[0]?.original_name).toBe('upload.txt')
   })
 
-  it('should use DB metadata not payload metadata for bridge message', async () => {
+  it('should use DB metadata not payload metadata for bridge message and persistence', async () => {
     const captured: { value: unknown } = { value: null }
     const bridge = createMockBridge(captured)
     const emitter = { emit: vi.fn() }
@@ -334,5 +343,12 @@ describe('executeBridgeRun — attachments', () => {
     const msg = captured.value as Array<Record<string, unknown>>
     expect(Array.isArray(msg)).toBe(true)
     expect(msg[0]).toMatchObject({ type: 'text', text: '[File: real-name.txt]\nreal content' })
+
+    const stored = messageStore.list('sess-att')
+    const userMsg = stored.find((m) => m.role === 'user')
+    expect(userMsg?.attachments).toHaveLength(1)
+    expect(userMsg?.attachments?.[0]?.original_name).toBe('real-name.txt')
+    expect(userMsg?.attachments?.[0]?.mime_type).toBe('text/plain')
+    expect(userMsg?.attachments?.[0]?.size).toBe(content.length)
   })
 })

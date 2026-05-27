@@ -4,7 +4,7 @@ import type { AgentBridgeClient, AgentBridgeOutput } from '../agent-bridge.js'
 import type { AttachmentStore } from '../attachment-store.js'
 import type { MessageStore } from '../message-store.js'
 import type { SessionStore } from '../session-store.js'
-import type { RunPayload } from './types.js'
+import type { AttachmentRef, RunPayload } from './types.js'
 
 export interface BridgeRunDeps {
   bridge: AgentBridgeClient
@@ -44,13 +44,15 @@ export async function executeBridgeRun(
 
   const priorMessages = messageStore.list(sessionId)
 
+  const { message, acceptedAttachments } = await resolveAttachments(payload, deps, sessionId)
+
   const userMsgInput: Parameters<typeof messageStore.append>[0] = {
     session_id: sessionId,
     role: 'user',
     content: payload.input,
   }
-  if (payload.attachments && payload.attachments.length > 0) {
-    userMsgInput.attachments = payload.attachments
+  if (acceptedAttachments.length > 0) {
+    userMsgInput.attachments = acceptedAttachments
   }
   messageStore.append(userMsgInput)
 
@@ -67,7 +69,6 @@ export async function executeBridgeRun(
     }))
   }
 
-  const message = await buildBridgeMessage(payload, deps, sessionId)
   const chatStarted = await bridge.chat(sessionId, message, chatOptions)
 
   const runId = chatStarted.run_id
@@ -324,16 +325,24 @@ function ensureSession(store: SessionStore, sessionId: string, payload: RunPaylo
 
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
 
-async function buildBridgeMessage(
+interface ResolvedAttachments {
+  message: string | Array<Record<string, unknown>>
+  acceptedAttachments: AttachmentRef[]
+}
+
+async function resolveAttachments(
   payload: RunPayload,
   deps: BridgeRunDeps,
   sessionId: string,
-): Promise<string | Array<Record<string, unknown>>> {
+): Promise<ResolvedAttachments> {
+  const empty: ResolvedAttachments = { message: payload.input, acceptedAttachments: [] }
+
   if (!payload.attachments || payload.attachments.length === 0 || !deps.attachmentStore || !deps.uploadsDir) {
-    return payload.input
+    return empty
   }
 
   const contentBlocks: Array<Record<string, unknown>> = []
+  const accepted: AttachmentRef[] = []
 
   for (const ref of payload.attachments) {
     const attachment = deps.attachmentStore.get(ref.id)
@@ -344,6 +353,13 @@ async function buildBridgeMessage(
     } else if (attachment.session_id !== sessionId) {
       continue
     }
+
+    accepted.push({
+      id: attachment.id,
+      original_name: attachment.original_name,
+      mime_type: attachment.mime_type,
+      size: attachment.size,
+    })
 
     const filePath = join(deps.uploadsDir, attachment.stored_name)
     const buffer = await readFile(filePath)
@@ -369,9 +385,9 @@ async function buildBridgeMessage(
     }
   }
 
-  if (contentBlocks.length === 0) return payload.input
+  if (contentBlocks.length === 0) return empty
   contentBlocks.push({ type: 'text', text: payload.input })
-  return contentBlocks
+  return { message: contentBlocks, acceptedAttachments: accepted }
 }
 
 function delay(ms: number): Promise<void> {

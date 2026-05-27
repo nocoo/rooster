@@ -50,7 +50,8 @@ export class AttachmentStore {
     return result.changes > 0
   }
 
-  bindToSession(id: string, sessionId: string): void {
-    this.db.prepare('UPDATE attachments SET session_id = ? WHERE id = ? AND session_id IS NULL').run(sessionId, id)
+  bindToSession(id: string, sessionId: string): boolean {
+    const result = this.db.prepare('UPDATE attachments SET session_id = ? WHERE id = ? AND session_id IS NULL').run(sessionId, id)
+    return result.changes > 0
   }
 }
