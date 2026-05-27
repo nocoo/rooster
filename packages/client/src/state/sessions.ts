@@ -1,6 +1,6 @@
 import { signal, computed } from '@preact/signals'
-import { fetchSessions, fetchMessages, deleteSession, renameSession } from '../api/sessions.js'
-import type { Session, Message } from '../types.js'
+import { fetchSessions, fetchMessages, deleteSession, renameSession, searchSessions } from '../api/sessions.js'
+import type { Session, Message, SearchResult } from '../types.js'
 
 export const sessions = signal<Session[]>([])
 export const sessionsTotal = signal(0)
@@ -8,6 +8,13 @@ export const activeSessionId = signal<string | null>(null)
 export const messages = signal<Message[]>([])
 export const loading = signal(false)
 export const error = signal<string | null>(null)
+
+export const searchQuery = signal('')
+export const searchResults = signal<SearchResult[]>([])
+export const searchTotal = signal(0)
+export const searchLoading = signal(false)
+export const searchError = signal<string | null>(null)
+export const isSearching = computed(() => searchQuery.value.trim().length > 0)
 
 export const activeSession = computed(() =>
   sessions.value.find((s) => s.id === activeSessionId.value) ?? null,
@@ -62,4 +69,33 @@ export async function removeSession(id: string): Promise<void> {
 export async function updateSessionTitle(id: string, title: string): Promise<void> {
   await renameSession(id, title)
   sessions.value = sessions.value.map((s) => (s.id === id ? { ...s, title } : s))
+}
+
+export async function performSearch(q: string): Promise<void> {
+  const trimmed = q.trim()
+  searchQuery.value = q
+  if (!trimmed) {
+    searchResults.value = []
+    searchTotal.value = 0
+    searchError.value = null
+    return
+  }
+  searchLoading.value = true
+  searchError.value = null
+  try {
+    const result = await searchSessions(trimmed)
+    searchResults.value = result.results
+    searchTotal.value = result.total
+  } catch (err: unknown) {
+    searchError.value = err instanceof Error ? err.message : 'Search failed'
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+export function clearSearch(): void {
+  searchQuery.value = ''
+  searchResults.value = []
+  searchTotal.value = 0
+  searchError.value = null
 }

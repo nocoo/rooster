@@ -31,6 +31,16 @@ export interface SessionListResponse {
   total: number
 }
 
+export interface SearchResult {
+  session: Session
+  snippet: string | null
+}
+
+export interface SearchResponse {
+  results: SearchResult[]
+  total: number
+}
+
 export interface MessageListResponse {
   messages: Message[]
 }

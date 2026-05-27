@@ -4,6 +4,7 @@ import type {
   SessionListResponse,
   MessageListResponse,
   PaginatedMessagesResponse,
+  SearchResponse,
 } from '../types.js'
 
 export async function fetchSessions(opts?: {
@@ -47,4 +48,19 @@ export async function fetchMessagesPaginated(
   return api.get<PaginatedMessagesResponse>(
     `/api/hermes/sessions/conversations/${sessionId}/messages/paginated${qs ? `?${qs}` : ''}`,
   )
+}
+
+export async function searchSessions(q: string, opts?: {
+  limit?: number
+  offset?: number
+}): Promise<SearchResponse> {
+  const params = new URLSearchParams()
+  params.set('q', q)
+  if (opts?.limit !== undefined) params.set('limit', String(opts.limit))
+  if (opts?.offset !== undefined) params.set('offset', String(opts.offset))
+  return api.get<SearchResponse>(`/api/hermes/sessions/search?${params.toString()}`)
+}
+
+export function getExportUrl(sessionId: string, format: 'json' | 'markdown'): string {
+  return `/api/hermes/sessions/${sessionId}/export?format=${format}`
 }

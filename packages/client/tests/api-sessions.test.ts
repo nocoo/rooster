@@ -6,6 +6,8 @@ import {
   renameSession,
   fetchMessages,
   fetchMessagesPaginated,
+  searchSessions,
+  getExportUrl,
 } from '../src/api/sessions.js'
 
 vi.mock('../src/api/client.js', () => ({
@@ -113,6 +115,39 @@ describe('sessions API', () => {
       expect(mockGet).toHaveBeenCalledWith(
         '/api/hermes/sessions/conversations/s1/messages/paginated?after=m3',
       )
+    })
+  })
+
+  describe('searchSessions', () => {
+    it('should call GET /api/hermes/sessions/search with q param', async () => {
+      mockGet.mockResolvedValue({ results: [], total: 0 })
+      const result = await searchSessions('hello')
+      expect(mockGet).toHaveBeenCalledWith('/api/hermes/sessions/search?q=hello')
+      expect(result).toEqual({ results: [], total: 0 })
+    })
+
+    it('should include limit and offset params', async () => {
+      mockGet.mockResolvedValue({ results: [], total: 0 })
+      await searchSessions('test', { limit: 10, offset: 5 })
+      expect(mockGet).toHaveBeenCalledWith('/api/hermes/sessions/search?q=test&limit=10&offset=5')
+    })
+
+    it('should only include provided optional params', async () => {
+      mockGet.mockResolvedValue({ results: [], total: 0 })
+      await searchSessions('query', { limit: 15 })
+      expect(mockGet).toHaveBeenCalledWith('/api/hermes/sessions/search?q=query&limit=15')
+    })
+  })
+
+  describe('getExportUrl', () => {
+    it('should return JSON export URL', () => {
+      const url = getExportUrl('abc-123', 'json')
+      expect(url).toBe('/api/hermes/sessions/abc-123/export?format=json')
+    })
+
+    it('should return Markdown export URL', () => {
+      const url = getExportUrl('abc-123', 'markdown')
+      expect(url).toBe('/api/hermes/sessions/abc-123/export?format=markdown')
     })
   })
 })

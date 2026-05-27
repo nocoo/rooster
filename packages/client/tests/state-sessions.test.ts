@@ -5,9 +5,11 @@ vi.mock('../src/api/sessions.js', () => ({
   fetchMessages: vi.fn(),
   deleteSession: vi.fn(),
   renameSession: vi.fn(),
+  searchSessions: vi.fn(),
+  getExportUrl: (id: string, format: string) => `/api/hermes/sessions/${id}/export?format=${format}`,
 }))
 
-import { fetchSessions, fetchMessages, deleteSession, renameSession } from '../src/api/sessions.js'
+import { fetchSessions, fetchMessages, deleteSession, renameSession, searchSessions } from '../src/api/sessions.js'
 import {
   sessions,
   sessionsTotal,
@@ -21,12 +23,21 @@ import {
   setActiveSession,
   removeSession,
   updateSessionTitle,
+  searchQuery,
+  searchResults,
+  searchTotal,
+  searchLoading,
+  searchError,
+  isSearching,
+  performSearch,
+  clearSearch,
 } from '../src/state/sessions.js'
 
 const mockFetchSessions = vi.mocked(fetchSessions)
 const mockFetchMessages = vi.mocked(fetchMessages)
 const mockDeleteSession = vi.mocked(deleteSession)
 const mockRenameSession = vi.mocked(renameSession)
+const mockSearchSessions = vi.mocked(searchSessions)
 
 describe('sessions state', () => {
   beforeEach(() => {
@@ -37,6 +48,11 @@ describe('sessions state', () => {
     messages.value = []
     loading.value = false
     error.value = null
+    searchQuery.value = ''
+    searchResults.value = []
+    searchTotal.value = 0
+    searchLoading.value = false
+    searchError.value = null
   })
 
   describe('loadSessions', () => {
@@ -186,6 +202,92 @@ describe('sessions state', () => {
 
       expect(mockRenameSession).toHaveBeenCalledWith('s1', 'New Title')
       expect(sessions.value[0]?.title).toBe('New Title')
+    })
+  })
+
+  describe('performSearch', () => {
+    it('should call searchSessions and set results', async () => {
+      const data = {
+        results: [{ session: { id: 's1', started_at: '2025-01-01', last_active: '2025-01-01' }, snippet: 'match' }],
+        total: 1,
+      }
+      mockSearchSessions.mockResolvedValue(data)
+
+      await performSearch('hello')
+
+      expect(mockSearchSessions).toHaveBeenCalledWith('hello')
+      expect(searchQuery.value).toBe('hello')
+      expect(searchResults.value).toEqual(data.results)
+      expect(searchTotal.value).toBe(1)
+      expect(searchLoading.value).toBe(false)
+    })
+
+    it('should clear results for empty query', async () => {
+      searchResults.value = [{ session: { id: 's1', started_at: '2025-01-01', last_active: '2025-01-01' }, snippet: null }]
+      searchTotal.value = 1
+
+      await performSearch('')
+
+      expect(mockSearchSessions).not.toHaveBeenCalled()
+      expect(searchResults.value).toHaveLength(0)
+      expect(searchTotal.value).toBe(0)
+    })
+
+    it('should trim whitespace-only query', async () => {
+      await performSearch('   ')
+
+      expect(mockSearchSessions).not.toHaveBeenCalled()
+      expect(searchResults.value).toHaveLength(0)
+    })
+
+    it('should set error on failure', async () => {
+      mockSearchSessions.mockRejectedValue(new Error('Server error'))
+
+      await performSearch('test')
+
+      expect(searchError.value).toBe('Server error')
+      expect(searchLoading.value).toBe(false)
+    })
+
+    it('should set generic error for non-Error throws', async () => {
+      mockSearchSessions.mockRejectedValue(500)
+
+      await performSearch('test')
+
+      expect(searchError.value).toBe('Search failed')
+    })
+  })
+
+  describe('clearSearch', () => {
+    it('should reset all search state', () => {
+      searchQuery.value = 'hello'
+      searchResults.value = [{ session: { id: 's1', started_at: '2025-01-01', last_active: '2025-01-01' }, snippet: null }]
+      searchTotal.value = 1
+      searchError.value = 'oops'
+
+      clearSearch()
+
+      expect(searchQuery.value).toBe('')
+      expect(searchResults.value).toHaveLength(0)
+      expect(searchTotal.value).toBe(0)
+      expect(searchError.value).toBeNull()
+    })
+  })
+
+  describe('isSearching', () => {
+    it('should be true when query has content', () => {
+      searchQuery.value = 'hello'
+      expect(isSearching.value).toBe(true)
+    })
+
+    it('should be false for empty query', () => {
+      searchQuery.value = ''
+      expect(isSearching.value).toBe(false)
+    })
+
+    it('should be false for whitespace-only query', () => {
+      searchQuery.value = '   '
+      expect(isSearching.value).toBe(false)
     })
   })
 })
