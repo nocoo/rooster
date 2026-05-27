@@ -1,0 +1,3 @@
+# OSV-Scanner configuration
+# Ignore upstream vulnerabilities that cannot be fixed by updating direct dependencies.
+# Add per-vulnerability entries only with a rationale and an expiry date.

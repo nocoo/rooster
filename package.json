@@ -13,6 +13,7 @@
     "test:coverage": "bun run rebuild:native && vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p packages/server --noEmit && tsc -p packages/client --noEmit && tsc --noEmit",
+    "gate:security": "tsx scripts/run-security.ts",
     "prepare": "husky"
   },
   "lint-staged": {
