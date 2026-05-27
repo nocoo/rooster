@@ -1,5 +1,6 @@
 import type { Server, Socket } from 'socket.io'
 import type { AgentBridgeClient } from '../agent-bridge.js'
+import type { AttachmentStore } from '../attachment-store.js'
 import type { SessionStore } from '../session-store.js'
 import type { MessageStore } from '../message-store.js'
 import { executeBridgeRun } from './bridge-run.js'
@@ -11,6 +12,8 @@ export interface ChatRunDeps {
   bridge: AgentBridgeClient
   sessionStore: SessionStore
   messageStore: MessageStore
+  attachmentStore?: AttachmentStore
+  uploadsDir?: string
 }
 
 interface ActiveRun {

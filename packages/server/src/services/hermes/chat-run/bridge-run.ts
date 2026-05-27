@@ -1,4 +1,7 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { AgentBridgeClient, AgentBridgeOutput } from '../agent-bridge.js'
+import type { AttachmentStore } from '../attachment-store.js'
 import type { MessageStore } from '../message-store.js'
 import type { SessionStore } from '../session-store.js'
 import type { RunPayload } from './types.js'
@@ -7,6 +10,8 @@ export interface BridgeRunDeps {
   bridge: AgentBridgeClient
   sessionStore: SessionStore
   messageStore: MessageStore
+  attachmentStore?: AttachmentStore
+  uploadsDir?: string
 }
 
 export interface RunEmitter {
@@ -62,7 +67,8 @@ export async function executeBridgeRun(
     }))
   }
 
-  const chatStarted = await bridge.chat(sessionId, payload.input, chatOptions)
+  const message = await buildBridgeMessage(payload, deps)
+  const chatStarted = await bridge.chat(sessionId, message, chatOptions)
 
   const runId = chatStarted.run_id
 
@@ -314,6 +320,50 @@ function ensureSession(store: SessionStore, sessionId: string, payload: RunPaylo
     if (payload.source) input['source'] = payload.source
     store.create(input)
   }
+}
+
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
+
+async function buildBridgeMessage(
+  payload: RunPayload,
+  deps: BridgeRunDeps,
+): Promise<string | Array<Record<string, unknown>>> {
+  if (!payload.attachments || payload.attachments.length === 0 || !deps.attachmentStore || !deps.uploadsDir) {
+    return payload.input
+  }
+
+  const contentBlocks: Array<Record<string, unknown>> = []
+
+  for (const ref of payload.attachments) {
+    const attachment = deps.attachmentStore.get(ref.id)
+    if (!attachment) continue
+
+    const filePath = join(deps.uploadsDir, attachment.stored_name)
+    const buffer = await readFile(filePath)
+    const base64 = buffer.toString('base64')
+
+    if (IMAGE_TYPES.has(attachment.mime_type)) {
+      contentBlocks.push({
+        type: 'image',
+        source: { type: 'base64', media_type: attachment.mime_type, data: base64 },
+      })
+    } else if (attachment.mime_type === 'application/pdf') {
+      contentBlocks.push({
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: base64 },
+        title: attachment.original_name,
+      })
+    } else {
+      const text = buffer.toString('utf-8')
+      contentBlocks.push({
+        type: 'text',
+        text: `[File: ${attachment.original_name}]\n${text}`,
+      })
+    }
+  }
+
+  contentBlocks.push({ type: 'text', text: payload.input })
+  return contentBlocks
 }
 
 function delay(ms: number): Promise<void> {
