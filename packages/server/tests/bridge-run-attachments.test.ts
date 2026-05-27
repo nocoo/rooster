@@ -84,7 +84,7 @@ describe('executeBridgeRun — attachments', () => {
     expect(captured.value).toBe('hello')
   })
 
-  it('should build content array with image attachment', async () => {
+  it('should inject local path for image attachment', async () => {
     const captured: { value: unknown } = { value: null }
     const bridge = createMockBridge(captured)
     const emitter = { emit: vi.fn() }
@@ -113,14 +113,13 @@ describe('executeBridgeRun — attachments', () => {
       new AbortController().signal,
     )
 
-    const msg = captured.value as Array<Record<string, unknown>>
-    expect(Array.isArray(msg)).toBe(true)
-    expect(msg).toHaveLength(2)
-    expect(msg[0]).toMatchObject({ type: 'image', source: { type: 'base64', media_type: 'image/png' } })
-    expect(msg[1]).toMatchObject({ type: 'text', text: 'describe this' })
+    const msg = captured.value as string
+    expect(msg).toContain('describe this')
+    expect(msg).toContain('[Attachment: screenshot.png]')
+    expect(msg).toContain(`Local path: ${join(uploadsDir, storedName)}`)
   })
 
-  it('should build content array with PDF attachment', async () => {
+  it('should inject local path for PDF attachment', async () => {
     const captured: { value: unknown } = { value: null }
     const bridge = createMockBridge(captured)
     const emitter = { emit: vi.fn() }
@@ -149,13 +148,13 @@ describe('executeBridgeRun — attachments', () => {
       new AbortController().signal,
     )
 
-    const msg = captured.value as Array<Record<string, unknown>>
-    expect(Array.isArray(msg)).toBe(true)
-    expect(msg[0]).toMatchObject({ type: 'document', title: 'report.pdf' })
-    expect(msg[1]).toMatchObject({ type: 'text', text: 'summarize' })
+    const msg = captured.value as string
+    expect(msg).toContain('summarize')
+    expect(msg).toContain('[Attachment: report.pdf]')
+    expect(msg).toContain(`Local path: ${join(uploadsDir, storedName)}`)
   })
 
-  it('should build content array with text file attachment', async () => {
+  it('should inject local path for text file attachment', async () => {
     const captured: { value: unknown } = { value: null }
     const bridge = createMockBridge(captured)
     const emitter = { emit: vi.fn() }
@@ -184,10 +183,10 @@ describe('executeBridgeRun — attachments', () => {
       new AbortController().signal,
     )
 
-    const msg = captured.value as Array<Record<string, unknown>>
-    expect(Array.isArray(msg)).toBe(true)
-    expect(msg[0]).toMatchObject({ type: 'text', text: '[File: notes.txt]\nHello from a text file' })
-    expect(msg[1]).toMatchObject({ type: 'text', text: 'read this' })
+    const msg = captured.value as string
+    expect(msg).toContain('read this')
+    expect(msg).toContain('[Attachment: notes.txt]')
+    expect(msg).toContain(`Local path: ${join(uploadsDir, storedName)}`)
   })
 
   it('should skip attachment when id not found in store', async () => {
@@ -232,7 +231,7 @@ describe('executeBridgeRun — attachments', () => {
     expect(captured.value).toBe('hello')
   })
 
-  it('should reject attachment belonging to a different session', async () => {
+  it('should reject attachment belonging to a different session without leaking path', async () => {
     const captured: { value: unknown } = { value: null }
     const bridge = createMockBridge(captured)
     const emitter = { emit: vi.fn() }
@@ -261,14 +260,17 @@ describe('executeBridgeRun — attachments', () => {
       new AbortController().signal,
     )
 
-    expect(captured.value).toBe('show me')
+    const msg = captured.value as string
+    expect(msg).toBe('show me')
+    expect(msg).not.toContain(storedName)
+    expect(msg).not.toContain('Local path')
 
     const stored = messageStore.list('sess-B')
     const userMsg = stored.find((m) => m.role === 'user')
     expect(userMsg?.attachments).toBeNull()
   })
 
-  it('should bind pending attachment (session_id=null) to current session and inject', async () => {
+  it('should bind pending attachment (session_id=null) to current session and inject path', async () => {
     const captured: { value: unknown } = { value: null }
     const bridge = createMockBridge(captured)
     const emitter = { emit: vi.fn() }
@@ -298,10 +300,10 @@ describe('executeBridgeRun — attachments', () => {
       new AbortController().signal,
     )
 
-    const msg = captured.value as Array<Record<string, unknown>>
-    expect(Array.isArray(msg)).toBe(true)
-    expect(msg[0]).toMatchObject({ type: 'text', text: '[File: upload.txt]\npending file content' })
-    expect(msg[1]).toMatchObject({ type: 'text', text: 'process this' })
+    const msg = captured.value as string
+    expect(msg).toContain('process this')
+    expect(msg).toContain('[Attachment: upload.txt]')
+    expect(msg).toContain(`Local path: ${join(uploadsDir, storedName)}`)
 
     expect(attachmentStore.get(attachment.id)?.session_id).toBe('sess-new')
 
@@ -340,9 +342,9 @@ describe('executeBridgeRun — attachments', () => {
       new AbortController().signal,
     )
 
-    const msg = captured.value as Array<Record<string, unknown>>
-    expect(Array.isArray(msg)).toBe(true)
-    expect(msg[0]).toMatchObject({ type: 'text', text: '[File: real-name.txt]\nreal content' })
+    const msg = captured.value as string
+    expect(msg).toContain('[Attachment: real-name.txt]')
+    expect(msg).not.toContain('FAKE-NAME.txt')
 
     const stored = messageStore.list('sess-att')
     const userMsg = stored.find((m) => m.role === 'user')
@@ -352,7 +354,7 @@ describe('executeBridgeRun — attachments', () => {
     expect(userMsg?.attachments?.[0]?.size).toBe(content.length)
   })
 
-  it('should skip pending attachment when bindToSession fails (race lost)', async () => {
+  it('should skip pending attachment when bindToSession fails (race lost) without leaking path', async () => {
     const captured: { value: unknown } = { value: null }
     const bridge = createMockBridge(captured)
     const emitter = { emit: vi.fn() }
@@ -369,7 +371,6 @@ describe('executeBridgeRun — attachments', () => {
       size: content.length,
     })
 
-    // Spy on bindToSession to simulate race: get() sees null, but bind fails
     vi.spyOn(attachmentStore, 'bindToSession').mockReturnValue(false)
 
     await executeBridgeRun(
@@ -383,7 +384,10 @@ describe('executeBridgeRun — attachments', () => {
       new AbortController().signal,
     )
 
-    expect(captured.value).toBe('try me')
+    const msg = captured.value as string
+    expect(msg).toBe('try me')
+    expect(msg).not.toContain(storedName)
+    expect(msg).not.toContain('Local path')
 
     const stored = messageStore.list('sess-racer')
     const userMsg = stored.find((m) => m.role === 'user')

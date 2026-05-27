@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentBridgeClient, AgentBridgeOutput } from '../agent-bridge.js'
 import type { AttachmentStore } from '../attachment-store.js'
@@ -44,7 +43,7 @@ export async function executeBridgeRun(
 
   const priorMessages = messageStore.list(sessionId)
 
-  const { message, acceptedAttachments } = await resolveAttachments(payload, deps, sessionId)
+  const { message, acceptedAttachments } = resolveAttachments(payload, deps, sessionId)
 
   const userMsgInput: Parameters<typeof messageStore.append>[0] = {
     session_id: sessionId,
@@ -323,25 +322,23 @@ function ensureSession(store: SessionStore, sessionId: string, payload: RunPaylo
   }
 }
 
-const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
-
 interface ResolvedAttachments {
-  message: string | Array<Record<string, unknown>>
+  message: string
   acceptedAttachments: AttachmentRef[]
 }
 
-async function resolveAttachments(
+function resolveAttachments(
   payload: RunPayload,
   deps: BridgeRunDeps,
   sessionId: string,
-): Promise<ResolvedAttachments> {
+): ResolvedAttachments {
   const empty: ResolvedAttachments = { message: payload.input, acceptedAttachments: [] }
 
   if (!payload.attachments || payload.attachments.length === 0 || !deps.attachmentStore || !deps.uploadsDir) {
     return empty
   }
 
-  const contentBlocks: Array<Record<string, unknown>> = []
+  const pathLines: string[] = []
   const accepted: AttachmentRef[] = []
 
   for (const ref of payload.attachments) {
@@ -362,32 +359,12 @@ async function resolveAttachments(
     })
 
     const filePath = join(deps.uploadsDir, attachment.stored_name)
-    const buffer = await readFile(filePath)
-    const base64 = buffer.toString('base64')
-
-    if (IMAGE_TYPES.has(attachment.mime_type)) {
-      contentBlocks.push({
-        type: 'image',
-        source: { type: 'base64', media_type: attachment.mime_type, data: base64 },
-      })
-    } else if (attachment.mime_type === 'application/pdf') {
-      contentBlocks.push({
-        type: 'document',
-        source: { type: 'base64', media_type: 'application/pdf', data: base64 },
-        title: attachment.original_name,
-      })
-    } else {
-      const text = buffer.toString('utf-8')
-      contentBlocks.push({
-        type: 'text',
-        text: `[File: ${attachment.original_name}]\n${text}`,
-      })
-    }
+    pathLines.push(`[Attachment: ${attachment.original_name}]\nLocal path: ${filePath}`)
   }
 
-  if (contentBlocks.length === 0) return empty
-  contentBlocks.push({ type: 'text', text: payload.input })
-  return { message: contentBlocks, acceptedAttachments: accepted }
+  if (pathLines.length === 0) return empty
+  const message = payload.input + '\n\n' + pathLines.join('\n\n')
+  return { message, acceptedAttachments: accepted }
 }
 
 function delay(ms: number): Promise<void> {
