@@ -21,7 +21,7 @@ Authoritative source: nmem memory `nocoo-6dq-score-log` (2026-05-07 全量重评
 |-----|------|------------|----------------------|
 | **L0** | Executable carrier | `dev` / `build` / `start` actually work end-to-end | manual + CI smoke |
 | **L1** | Unit tests | Logic + pure functions, branch coverage **≥ 80%** (rooster target 95%) | `vitest run --coverage` |
-| **L2** | Integration tests | Real HTTP / IPC E2E hitting the bound dependency, **route × method coverage gate** | `vitest` against real Hono listen + real socket |
+| **L2** | Integration tests | Real HTTP / IPC E2E hitting the bound dependency, **route × method coverage gate**. **In-memory `app.request(...)` does NOT count** — must be real `http.Server.listen(0)` + real `fetch` / `socket.io-client` | `vitest` against real Hono `serve()` listen + real socket |
 | **L3** | System / browser E2E | Playwright on a running stack | `playwright test` (**excluded from this round**) |
 | **G1** | Static analysis | 0 error + 0 warning, strict rules + typecheck | `eslint --max-warnings 0` + `tsc --noEmit` |
 | **G2** | Security gate | Dependency CVE scan + secrets leak scan | `osv-scanner` + `gitleaks` |
@@ -60,18 +60,29 @@ husky, lint-staged) — we use it as the reference pattern.
 | G2 | `scripts/run-security.ts` runs `osv-scanner --lockfile=bun.lock` **and** `osv-scanner --lockfile=probe/Cargo.lock` **and** `gitleaks git --log-opts=@{u}..HEAD` |
 | D1 | `[env.test]` binding to `bat-db-test` + `scripts/verify-test-bindings.ts` (asserts `-test` suffix on every test DB) + `_test_marker` migration |
 
-### bat's hook shape
+### bat's hook shape (verified against `bat/.husky/*` on 2026-05-28)
 
 ```
-pre-commit (.husky/pre-commit):
-  G1: turbo typecheck → lint-staged → (rust) cargo fmt --check + cargo clippy -D warnings
+pre-commit (.husky/pre-commit) — parallel, fail-fast:
+  G1: turbo typecheck
+  G1: lint-staged (biome --error-on-warnings on staged files)
+  G2: gitleaks protect --staged --no-banner       # staged-only secret scan
   L1: scripts/check-coverage.sh 90 95
+  L2 (static): gate:routes                         # static route × method coverage
+  L3 (static): gate:pages                          # static page coverage
+  (rust) cargo fmt --check + cargo clippy -D warnings   # only if probe/ changed
 
-pre-push (.husky/pre-push):
-  Run in PARALLEL with fail-fast:
-    L2: bun turbo test:e2e --filter=@bat/worker
-    G2: bun run gate:security    # osv-scanner + gitleaks
+pre-push (.husky/pre-push) — parallel, fail-fast:
+  L2: bun turbo test:e2e --filter=@bat/worker
+  G2: bun run gate:security    # osv-scanner (bun.lock + Cargo.lock) + gitleaks @{u}..HEAD
 ```
+
+Notes:
+- bat runs **two flavors** of gitleaks (staged at commit time, range
+  `@{u}..HEAD` at push time). Both are valuable; rooster should adopt the
+  push-time variant first (cheaper to wire) and add staged later.
+- `gate:routes` runs **statically** at pre-commit in bat — no HTTP boot.
+  rooster can do the same once the script lands.
 
 ### bat's CI shape (`.github/workflows/ci.yml`)
 
@@ -84,8 +95,18 @@ Five parallel jobs:
 4. `l3-playwright` — Playwright on `@bat/ui`
 5. `probe` — `cargo test` + `cargo clippy -D warnings` + `cargo fmt --check`
 
-> rooster does not have a wrangler/CF surface, so we map (3) to the Hono server
-> integration layer instead of wrangler. (1), (2), (5) translate directly.
+> **What translates to rooster, what does not.** rooster has no CF Worker /
+> wrangler surface and no Rust probe, so:
+> - `quality` (1) — borrow the contract (L1 + G1 + G2 in one job), but call
+>   it directly; `base-ci/bun-quality.yml@v2026.1`'s exact compatibility with a
+>   `better-sqlite3`-backed Hono stack must be verified (see open question §9).
+> - `coverage-gates` (2) — borrow the *shape* (static gates, no runtime). Drop
+>   `gate:pages` — rooster has no SSR/page tree; only `gate:routes` applies.
+> - `l2-e2e` (3) — replace wrangler with a real `@hono/node-server` listen +
+>   real `fetch` / `socket.io-client`. This is the rooster L2 runtime.
+> - `l3-playwright` (4) — **do not port.** L3 is explicitly out of scope and we
+>   do not add a stub job (no `workflow_dispatch` placeholder either).
+> - `probe` (5) — **do not port.** rooster has no Rust component.
 
 ---
 
@@ -101,16 +122,16 @@ default branch `main`, origin `github.com/nocoo/rooster.git`.
 | **L0** | `package.json` exposes `dev` / `build` / `start` per package. `scripts/dev-all.sh` boots full stack. |
 | **L1** | `vitest.config.ts` v8 coverage @ **95 / 95 / 95 / 95** thresholds (lines/functions/branches/statements). Per `docs/07-phase2-status.md`: 572 tests, branch 95.4%, statement 98.63%. |
 | **G1** | `eslint.config.ts` uses `tseslint.configs.strictTypeChecked` + `no-explicit-any: error` + `consistent-type-imports: error`. Root `lint` script: `eslint . --max-warnings 0`. Root `typecheck`: `tsc -p server --noEmit && tsc -p client --noEmit && tsc --noEmit`. |
-| **L2** (partial) | `packages/server/tests/server-bootstrap.test.ts` already does `server.httpServer.listen(0)` + `fetch('http://localhost:${port}/health')` — real HTTP. `chat-run.test.ts` boots a real Socket.IO server. |
-| **D1** (partial) | All DB tests use `:memory:` SQLite via `createDb(':memory:')`. File-mode tests write to `/tmp/rooster-test-<pid>.db` and `unlink` on teardown. |
+| **L2** (partial) | `packages/server/tests/server-bootstrap.test.ts` already does `server.httpServer.listen(0)` + `fetch('http://localhost:${port}/health')` — real HTTP. `chat-run.test.ts` boots a real Socket.IO server. **However** the unit-test pool is dominated by `app.request(...)` in-memory calls, which are not L2-grade per §1. |
+| **D1** (partial) | DB resolver is `path ?? process.env.ROOSTER_DB_PATH ?? 'rooster.db'` (`packages/server/src/services/hermes/db.ts:107`). Uploads default to `process.cwd()/uploads` (`packages/server/src/app.ts:23`). Tests use `createDb(':memory:')`; `db.test.ts` writes `/tmp/rooster-test-<pid>.db` and `unlink`s on teardown. **No** `~/.rooster/` or `~/Library/Application Support/rooster/` path is used by the resolver — those are not the prod path family. |
 
 ### 3.2 Gaps ❌
 
 | Dim | Gap | Impact |
 |-----|-----|--------|
-| **L2** | No dedicated `test:e2e` script and no `gate:routes` style coverage check. Real-HTTP tests are scattered inside the unit-test pool, mixed with mocks. Route × method coverage is **not measured**. | Tier S blocker. Can pass overall test count but silently miss routes. |
+| **L2** | No dedicated `test:e2e` script and no `gate:routes` style coverage check. Real-HTTP tests are scattered inside the unit-test pool, mixed with `app.request(...)` in-memory calls that don't qualify as L2. Route × method coverage is **not measured**. | Tier S blocker. Can pass overall test count but silently miss routes. |
 | **G2** | **Zero** security tooling. No `osv-scanner`, no `gitleaks`, no `gate:security` script. `bun.lock` exists (perfect input for `osv-scanner v2`) but is never scanned. | Tier B downgrade. CVE-laden deps could ship undetected. |
-| **D1** | In-memory + `/tmp` *do* isolate runtime, but there is **no validation script** asserting tests never touch a persisted dev DB path. No `_test_marker` style guard. No banned-path check (e.g. test must not write to `~/.rooster/` or whatever the prod path is). Single layer of isolation only. | Counts as ⚠️, not ✅. 6DQ requires ≥ 2 verified layers. |
+| **D1** | `:memory:` + `/tmp/rooster-test-<pid>.db` provide layer-1 physical separation, but there is **no validation script** asserting tests never bind to the actual resolver default (`rooster.db` at `process.cwd()`) or to a caller-supplied `ROOSTER_DB_PATH`. The resolver is `path ?? ROOSTER_DB_PATH ?? 'rooster.db'`; uploads default to `process.cwd()/uploads`. Single layer of isolation only. | Counts as ⚠️, not ✅. 6DQ requires ≥ 2 verified layers. |
 | **Hooks** | `.husky/pre-commit` only — runs `lint && typecheck && test:coverage`. **No `.husky/pre-push`** exists at all. G2 + heavy L2 should live there. | Local guard rail missing. Bad pushes possible from local. |
 | **CI** | **No `.github/workflows/`** exists in the repo. All quality work runs only on developer machines. | Hard Tier-C signal — managed repos must have CI. |
 | **L3** | No Playwright, no browser tests. | **Out of scope for this round.** Acceptable as ❌ for now, drop us to Tier A max. |
@@ -157,74 +178,121 @@ when `bun.lock` contains a known CVE or when a staged commit between
 
 ### Phase 2 — L2 layer separation + route × method coverage gate
 
-**Why second**: Tier S requires every HTTP/Socket.IO route to have an L2 test
+**Why second**: Tier S requires every HTTP / Socket.IO route to have an L2 test
 hit. We have real-HTTP tests but no proof they cover the surface.
+
+**L2 definition (strict)**: an L2 test must boot a real `http.Server` via
+`@hono/node-server` `serve()` on an ephemeral port (`listen(0)`) and call it
+through real `fetch` (or, for sockets, real `socket.io-client`). In-memory
+`app.request(...)` calls are *not* L2 — they bypass the HTTP layer and don't
+exercise content negotiation, status code wire format, or socket handshake.
+They stay where they are (unit / integration-lite); they do not count toward
+route coverage.
 
 | Item | Detail |
 |------|--------|
-| Refactor (test-tree only, no `src/`) | Move real-HTTP integration tests out of `packages/server/tests/` into `packages/server/tests/e2e/` (`*.e2e.test.ts`). Pure-mock unit tests stay where they are. |
+| Refactor (test-tree only, no `src/`) | Move real-`listen()` integration tests into `packages/server/tests/e2e/` (`*.e2e.test.ts`). `app.request(...)`-based tests stay under `tests/` as unit/integration-lite — they are not L2. |
 | Add | `packages/server/vitest.e2e.config.ts` — separate config that only loads `*.e2e.test.ts`, no coverage thresholds (L2 doesn't gate coverage; L2 gates route hits). |
 | Add | `package.json` script `test:e2e`: `vitest run -c packages/server/vitest.e2e.config.ts`. |
-| Add | `scripts/check-route-coverage.ts` — static analyzer that walks `packages/server/src/routes/**` for `.get/.post/.put/.delete/.patch` calls, then walks `packages/server/tests/e2e/**` for matching `fetch(... method: 'POST')` calls; **fails** if any route × method is uncovered. Modeled on `bat/scripts/check-route-coverage.ts`. |
-| Add | `package.json` script `gate:routes`: `bun run scripts/check-route-coverage.ts`. |
+| Add | `scripts/check-route-coverage.ts` — static analyzer that walks `packages/server/src/routes/**` for `.get/.post/.put/.delete/.patch` calls (resolving each sub-router's mount prefix from `app.ts`), then walks `packages/server/tests/e2e/**` for matching `fetch(url, { method })` / `socket.emit(event)` calls; **fails** if any route × method is uncovered. Modeled on `bat/scripts/check-route-coverage.ts` but extended for Hono `:id` params and Socket.IO events. |
+| Add | `package.json` root script `gate:routes`: `bun run scripts/check-route-coverage.ts`. |
 | Wire | extend `.husky/pre-push` to run `test:e2e` + `gate:routes` in **parallel** with `gate:security` (fail-fast). |
 
-**Current route surface to cover** (sourced from `src/routes/`):
+**Current route surface** (verified from `packages/server/src/app.ts` mount
+table + each sub-router; all `routes.*` calls resolved against their mount
+prefix on 2026-05-28):
 
 ```
-GET    /api/health
-GET    /api/bridge/profiles
-GET    /api/bridge/models
-GET    /api/bridge/providers
-POST   /api/uploads
-GET    /api/uploads/:id
-GET    /api/sessions
-GET    /api/sessions/search
-GET    /api/sessions/conversations
-GET    /api/sessions/conversations/:id/messages
-GET    /api/sessions/conversations/:id/messages/paginated
-GET    /api/sessions/hermes
-GET    /api/sessions/hermes/:id
-GET    /api/sessions/:id
-GET    /api/sessions/:id/export
-DELETE /api/sessions/:id
-POST   /api/sessions/:id/rename
-…
+GET    /health                                                # routes/health.ts
+GET    /api/hermes/search/sessions                            # routes/sessions.ts createSearchRoutes
+GET    /api/hermes/sessions                                   # routes/sessions.ts createSessionRoutes "/"
+GET    /api/hermes/sessions/search                            # routes/sessions.ts (inner /search)
+GET    /api/hermes/sessions/conversations                     # routes/sessions.ts
+GET    /api/hermes/sessions/conversations/:id/messages
+GET    /api/hermes/sessions/conversations/:id/messages/paginated
+GET    /api/hermes/sessions/hermes                            # nested /hermes inside createSessionRoutes
+GET    /api/hermes/sessions/hermes/:id
+GET    /api/hermes/sessions/:id/export
+GET    /api/hermes/sessions/:id
+DELETE /api/hermes/sessions/:id
+POST   /api/hermes/sessions/:id/rename
+GET    /api/hermes/profiles                                   # routes/bridge.ts (mounted at /api/hermes)
+GET    /api/hermes/models
+GET    /api/hermes/providers
+POST   /api/upload                                            # routes/upload.ts "/"
+GET    /api/upload/:id
 ```
 
-Plus Socket.IO namespaces (`/chat-run`). The route-coverage script must extend
-to socket events (event-name × emit/listen pair).
+Plus Socket.IO `/chat-run` namespace events (event-name × emit/listen pair).
+The route-coverage script must enumerate both HTTP and socket surfaces.
 
-**Acceptance**: `bun run gate:routes` lists current uncovered route × method
-pairs (initial baseline may be > 0 — record it). Pre-push refuses to push if
-the list is non-empty. Backfill tests until empty.
+> **Open watch-out**: two `GET` routes resolve to the same path
+> `/api/hermes/sessions/search` — once from `createSearchRoutes` (mounted at
+> `/api/hermes/search`, handler `/sessions`) and once from inside
+> `createSessionRoutes` (mounted at `/api/hermes/sessions`, handler
+> `/search`). Different paths in fact:
+> `/api/hermes/search/sessions` vs `/api/hermes/sessions/search`. Both listed
+> above. The route-coverage script must treat them as distinct.
+
+**Acceptance & report-mode strategy**: do **not** commit a failing baseline.
+Phase 2 lands in two sub-commits:
+1. `gate:routes` ships in **report mode** (prints uncovered route × method,
+   always exits 0) — same commit as the script.
+2. Backfill e2e tests until the report is empty, then a follow-up sub-commit
+   flips the script to **strict mode** (`exit 1` on any uncovered entry) and
+   wires it into pre-push / CI.
+
+`main` must never carry a "permit uncovered" baseline file.
 
 **Commits**:
 1. `refactor(server/tests): split e2e tests into tests/e2e/ tree`
-2. `feat(scripts): add L2 route × method coverage gate`
-3. `chore(husky): wire test:e2e + gate:routes into pre-push`
+2. `feat(scripts): add L2 route × method coverage gate in report mode`
+3. `test(server/e2e): backfill e2e coverage to zero uncovered`
+4. `feat(scripts): flip gate:routes to strict; chore(husky): wire into pre-push`
 
 ---
 
 ### Phase 3 — D1 Isolation guard (second validation layer)
 
-**Why third**: `:memory:` and `/tmp` are layer 1 (physical separation). 6DQ
-asks for a second, programmatic guard.
+**Why third**: `:memory:` and `/tmp/rooster-test-<pid>.db` are layer 1
+(physical separation). 6DQ asks for a second, programmatic guard.
+
+**Actual resolver to defend against** (verified):
+
+- `packages/server/src/services/hermes/db.ts:107`:
+  `const dbPath = path ?? process.env['ROOSTER_DB_PATH'] ?? 'rooster.db'`
+- `packages/server/src/app.ts:23`:
+  `const uploadsDir = deps.uploadsDir ?? join(process.cwd(), 'uploads')`
+
+So the *prod-like* paths that tests must never bind to are:
+1. The literal default `'rooster.db'` (resolves to `process.cwd()/rooster.db`).
+2. Any `ROOSTER_DB_PATH` env value set in the test process.
+3. Any DB path that is **not** `:memory:` **and** not under `os.tmpdir()`.
+4. Any uploads dir that is **not** under `os.tmpdir()` (i.e. not the default
+   `process.cwd()/uploads`).
 
 | Item | Detail |
 |------|--------|
-| Add | `scripts/verify-test-isolation.ts` — static + runtime guard: (a) scans test files for any `createDb(` call whose arg is not `':memory:'` or a `/tmp/...` pattern; (b) at vitest setup, fails fast if process detects DB path under `~/.rooster/` or `$HOME/Library/Application Support/rooster/` (the prod path family). |
-| Add | `packages/server/tests/setup-d1-guard.ts` — vitest setupFile that hooks `process.env` and asserts no prod DB path is set during tests. |
+| Add | `scripts/verify-test-isolation.ts` — **static** guard: walks `packages/server/tests/**/*.ts` and rejects any `createDb(` literal arg that is not exactly `':memory:'` or a `path.join(os.tmpdir(), ...)` / `/tmp/...` pattern. Also rejects any `new AttachmentStore` / uploadsDir literal under `process.cwd()` in tests. |
+| Add | `packages/server/tests/setup-d1-guard.ts` — **runtime** guard (vitest setupFile): (a) fails if `process.env.ROOSTER_DB_PATH` is set at test start; (b) monkey-patches `createDb` (via module spy or by exporting a `__assertTestDbPath` hook) so that any non-`:memory:` / non-`os.tmpdir()` path aborts with a clear message; (c) asserts no test ever resolves `uploadsDir` to `process.cwd()/uploads`. |
 | Wire | `vitest.config.ts` `setupFiles: ['packages/server/tests/setup-d1-guard.ts']`. |
-| Add | `package.json` script `gate:isolation`: `bun run scripts/verify-test-isolation.ts`. |
-| Wire | add to `.husky/pre-commit` (cheap static check). |
+| Add | `package.json` root script `gate:isolation`: `bun run scripts/verify-test-isolation.ts`. |
+| Wire | add `gate:isolation` to `.husky/pre-commit` (cheap static check, no runtime). |
 
-**Acceptance**: `bun run gate:isolation` exits 0. If anyone adds
-`createDb('/Users/...')` to a test, the gate fails before commit.
+This gives two **independent** layers:
+- Layer 1 (physical): test code uses `:memory:` or `os.tmpdir()`.
+- Layer 2 (programmatic): both static (`gate:isolation`) and runtime
+  (`setup-d1-guard.ts`) verification reject any drift, including via
+  `ROOSTER_DB_PATH` env injection.
+
+**Acceptance**: `bun run gate:isolation` exits 0 on a clean tree. Adding a
+`createDb('./rooster-cache.db')` or setting `ROOSTER_DB_PATH=/Users/...` in a
+test fails the gate before commit, and again at vitest startup.
 
 **Commits**:
-1. `feat(scripts): add D1 isolation guard (static + runtime)`
-2. `chore(husky): wire gate:isolation into pre-commit`
+1. `feat(scripts): add D1 isolation static guard against resolver defaults`
+2. `feat(server/tests): add vitest setup runtime guard for ROOSTER_DB_PATH and createDb args`
+3. `chore(husky): wire gate:isolation into pre-commit`
 
 ---
 
@@ -259,32 +327,39 @@ hook layout that matches `bat`'s pattern.
 ### Phase 5 — CI workflows (`.github/workflows/`)
 
 **Why fifth**: rooster has *no* CI today; this is the single largest reason it
-cannot join the managed list. Mirror `bat/.github/workflows/ci.yml` but
-adapted to a non-Cloudflare Hono stack.
+cannot join the managed list. Borrow `bat/.github/workflows/ci.yml`'s
+contract, but only the jobs that apply to a Hono + better-sqlite3 stack.
 
 Proposed jobs (all parallel, fail-fast at job level):
 
 | Job | What it runs | Maps to |
 |-----|--------------|---------|
-| `quality` | `nocoo/base-ci/.github/workflows/bun-quality.yml@v2026.1` with `pre-command` building native (`tsx scripts/ensure-native.ts`) | L1 + G1 + G2 |
-| `coverage-gates` | `bun run gate:routes` + `bun run gate:isolation` | L2 (static) + D1 |
-| `l2-e2e` | `bun install` → `tsx scripts/ensure-native.ts` → `bun run test:e2e` | L2 (runtime) |
-| `(deferred) l3-e2e` | placeholder; not added this round | L3 (out of scope) |
+| `quality` | L1 + G1 + G2 in one job (`bun run lint`, `bun run typecheck`, `bun run test:coverage`, `bun run gate:security`). Either invoke directly or via `nocoo/base-ci/.github/workflows/bun-quality.yml@v2026.1` **if** §9 compatibility check passes. | L1 + G1 + G2 |
+| `coverage-gates` | `bun run gate:routes` + `bun run gate:isolation` — static, no runtime | L2 (static) + D1 |
+| `l2-e2e` | `bun install --frozen-lockfile` → native rebuild step → `bun run test:e2e` | L2 (runtime) |
+
+**Explicitly not added**: `l3-playwright` (out of scope, no stub, no
+`workflow_dispatch`) and `probe` (no Rust component).
 
 Notes:
-- `bun-quality.yml` already handles `osv-scanner` + `gitleaks` per the bat
-  pattern, so the security gate runs in CI even though it is *also* a local
-  pre-push hook. Both are desirable: pre-push catches the offender; CI catches
+- Run G2 in CI **and** in pre-push. Pre-push catches the offender; CI catches
   bypassed pushes.
-- `pre-command` must rebuild `better-sqlite3` native bindings because the lockfile
-  is installed with `--ignore-scripts`. Mirror bat's approach (loop over
-  `trustedDependencies` and run `bun run install`).
+- **Native rebuild caveat — must be verified before this phase ships.** The
+  current `scripts/ensure-native.ts` hard-codes
+  `packages/server/node_modules/better-sqlite3`. With bun workspaces the
+  package can be hoisted to the root `node_modules/`. Before adopting
+  `bat`'s pattern of `bun install --frozen-lockfile --ignore-scripts` + per
+  trusted-dep rebuild, confirm that the resolver in `ensure-native.ts` finds
+  the actual hoist / workspace location. If it doesn't, either (a) fix the
+  resolver to traverse `bun pm ls` output, or (b) keep `--ignore-scripts` off
+  in CI and let bun's normal install rebuild the native bindings (slower but
+  reliable). Pick one; do not assume bat's exact pattern works here.
 
-**Acceptance**: PR to `main` runs all 3 jobs; all green on `5fc4ca3`-equivalent
-baseline (post-Phases 1–3).
+**Acceptance**: PR to `main` runs all 3 jobs; all green on the post-Phase-4
+baseline.
 
 **Commits**:
-1. `ci: add .github/workflows/ci.yml (L1+G1+G2 quality, coverage gates, L2 e2e)`
+1. `ci: add .github/workflows/ci.yml (quality, coverage-gates, l2-e2e)`
 
 ---
 
@@ -326,13 +401,13 @@ All of the following must hold on `main` for ≥ 1 green CI run:
 1. `bun run lint` → exit 0, 0 warnings.
 2. `bun run typecheck` → exit 0.
 3. `bun run test:coverage` → exit 0, ≥ 95 / 95 / 95 / 95.
-4. `bun run test:e2e` → exit 0.
-5. `bun run gate:routes` → exit 0 (every route × method has ≥ 1 e2e hit).
-6. `bun run gate:security` → exit 0 (osv + gitleaks both clean).
-7. `bun run gate:isolation` → exit 0.
+4. `bun run test:e2e` → exit 0 (real `serve()` + real `fetch` / `socket.io-client`; no `app.request`).
+5. `bun run gate:routes` → exit 0 in **strict** mode (every route × method has ≥ 1 e2e hit; no baseline file allowed on `main`).
+6. `bun run gate:security` → exit 0 (osv-scanner v2 on `bun.lock` + gitleaks `@{u}..HEAD` both clean).
+7. `bun run gate:isolation` → exit 0 (no test binds to `'rooster.db'` default, no `ROOSTER_DB_PATH` env at test start, no uploadsDir under `process.cwd()`).
 8. `.husky/pre-commit` and `.husky/pre-push` exist and chain the gates above.
 9. `.github/workflows/ci.yml` exists; `quality`, `coverage-gates`, `l2-e2e`
-   jobs all pass on the latest `main` commit.
+   jobs all pass on the latest `main` commit. **No** `l3-playwright` job, **no** `probe` job.
 
 If 1–9 hold, rooster's row in `nocoo-6dq-score-log` becomes:
 `L0:✅ L1:✅ L2:✅ L3:❌ G1:✅ G2:✅ D1:✅` → **Tier A** ✅.
@@ -360,48 +435,54 @@ L3 → Tier S is a separate, deferred decision.
 Recording the spots most likely to be off so SD-Reviewer-B can target review:
 
 1. **Route × method gate over Hono regex routes.** `gate:routes` must
-   understand Hono's path params (`:id`) and matching test calls
-   (`fetch('/api/sessions/abc')` matches `:id`). Bat's script targets static
-   Worker bindings; the rooster port may need a richer matcher.
-2. **Socket.IO L2 coverage.** Bat is a pure HTTP worker. Rooster has a
-   `/chat-run` namespace. The plan claims to extend `gate:routes` to socket
-   events but doesn't yet specify the API for "covered event". Open question.
-3. **`base-ci/.github/workflows/bun-quality.yml@v2026.1` compatibility.** I
-   assume it accepts a node-style server stack (Hono + better-sqlite3) the same
-   way it accepts CF Worker stacks. May need a `pre-command` step for native
-   rebuild that does not exist in bat (bat uses workerd, not better-sqlite3).
-4. **`/tmp` writes vs CI.** `db.test.ts` writes to `/tmp/rooster-test-${pid}.db`.
-   CI runners' `/tmp` is fine, but multi-runner parallel matrices could
-   collide. Plan implicitly assumes single-runner per job; if matrix runs are
-   added, switch to `os.tmpdir()` + `mkdtemp`.
+   understand Hono's path params (`:id`) and join each sub-router with its
+   `app.route()` mount prefix (e.g. `createSessionRoutes` mounted at
+   `/api/hermes/sessions`). Bat's script targets static Worker bindings; the
+   rooster port needs both the prefix join and `:id` matching.
+2. **Socket.IO L2 coverage.** Bat is pure HTTP. Rooster has a `/chat-run`
+   namespace. "Covered event" is defined as: for every server-side
+   `socket.on('<event>', ...)`, an e2e test calls `client.emit('<event>', ...)`;
+   for every server-side `socket.emit('<event>', ...)`, an e2e test installs
+   `client.on('<event>', ...)`. Both directions must be enumerated.
+3. **`base-ci/.github/workflows/bun-quality.yml@v2026.1` compatibility.**
+   `bat` uses CF Workers + workerd. rooster uses Node + better-sqlite3. The
+   shared workflow's `pre-command` hook is the only escape valve; if its
+   default install assumes wrangler/workerd shape we may need to fork or call
+   gates directly. Verify before Phase 5 — fallback is a direct `quality` job.
+4. **`/tmp` writes vs CI matrix.** `db.test.ts` writes
+   `/tmp/rooster-test-${pid}.db`. Single-runner per job is fine; if a future
+   matrix runs the same test twice on the same runner, switch to
+   `fs.mkdtempSync(path.join(os.tmpdir(), 'rooster-test-'))`.
 5. **`exactOptionalPropertyTypes`.** Per `docs/07`, the project uses it.
-   `--max-warnings 0` already enforces this, but if any of the new test scaffolds
-   touch `?:` typing in trickier ways, they may surface fresh G1 violations.
-   Not a blocker; just a watch-out during implementation.
-6. **D1 prod path detection.** The plan names `~/.rooster/` and
-   `$HOME/Library/Application Support/rooster/` as banned prod paths in the
-   runtime guard. The actual prod path needs to be verified against the
-   server's resolver before the guard is written.
+   `--max-warnings 0` already enforces this; if new test scaffolds touch `?:`
+   typing trickier ways, they may surface fresh G1 violations. Watch during
+   implementation.
+6. **D1 prod path detection — corrected.** Previous draft (`cb2169d`) named
+   `~/.rooster/` and `~/Library/Application Support/rooster/` as banned
+   paths. Those are **wrong** — the actual resolver uses
+   `ROOSTER_DB_PATH ?? 'rooster.db'` (defaults to `process.cwd()/rooster.db`)
+   and uploads default to `process.cwd()/uploads`. Phase 3 has been rewritten
+   around the real resolver.
 
 ---
 
 ## 9. Open Questions for SD-Reviewer-B
 
-1. Is the **L3 deferral** the standing position or only for this sprint? Affects
-   whether `Phase 5` CI should include a stub `l3-playwright` job (off by
-   default, `workflow_dispatch`) so it's wired but not gating.
-2. Should `gate:security` use `osv-scanner v2` with `--lockfile=bun.lock` (bun
-   v1.3+ lockfile format) — or are we still on a bun version that emits an
-   older lockfile osv-scanner can't read? (Quick check: `bun --version` on
-   current rooster CI baseline.)
-3. For the route-coverage gate, do we want the **failing route list** to be
-   committed as a baseline (`docs/route-coverage-baseline.json`) so the first
-   pre-push doesn't block the very PR that adds the gate? Bat shipped it
-   already-clean; rooster will likely have a non-empty initial backlog.
-4. Native `better-sqlite3` rebuild step: keep `scripts/ensure-native.ts` as-is
-   (it's already a real script), or shift to bat's pattern of explicit
-   `--ignore-scripts` install + per-package `bun run install` in CI? The former
-   is simpler; the latter is more auditable.
+1. ~~Is the **L3 deferral** the standing position?~~ **Resolved** by Reviewer-B
+   (msg=62aa9265): L3 deferral is standing; CI must not add a stub /
+   `workflow_dispatch` placeholder. Plan updated.
+2. `osv-scanner v2` on `bun.lock` — confirm the bun version currently in use
+   emits a lockfile that osv-scanner v2 can read. Quick check at Phase 1
+   start: `bun --version` and a dry `osv-scanner --lockfile=bun.lock`.
+3. ~~Commit a failing route-coverage baseline?~~ **Resolved** by Reviewer-B
+   (msg=62aa9265): **no baseline file**. Phase 2 ships `gate:routes` in
+   report mode first, backfills tests, then flips to strict in the same phase
+   sequence. Plan updated.
+4. Native `better-sqlite3` rebuild step: the **prerequisite** is verifying
+   `scripts/ensure-native.ts`'s hard-coded
+   `packages/server/node_modules/better-sqlite3` path actually exists after a
+   fresh `bun install` under bun-workspaces hoisting. If not, fix the
+   resolver before Phase 5 lands. Captured as Phase 5 caveat.
 
 ---
 
