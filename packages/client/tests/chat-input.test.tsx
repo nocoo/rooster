@@ -191,4 +191,60 @@ describe('ChatInput', () => {
     render(<ChatInput />)
     expect(screen.getByText('Stop')).toBeTruthy()
   })
+
+  it('should send on Ctrl+Enter', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'ctrl send'
+    fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true, shiftKey: false })
+    expect(mockSend).toHaveBeenCalledWith('ctrl send', undefined)
+  })
+
+  it('should send on Cmd+Enter (metaKey)', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = 'cmd send'
+    fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true, shiftKey: false })
+    expect(mockSend).toHaveBeenCalledWith('cmd send', undefined)
+  })
+
+  it('should not send on Ctrl+Enter during IME composition', () => {
+    render(<ChatInput />)
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>('Message input')
+    textarea.value = '你好'
+    fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true, shiftKey: false, isComposing: true })
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('should abort on Esc when streaming', () => {
+    activeSessionId.value = 'test-session'
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+    render(<ChatInput />)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(mockAbort).toHaveBeenCalled()
+  })
+
+  it('should not abort on Esc when already aborting', () => {
+    activeSessionId.value = 'test-session'
+    runStates.value = { 'test-session': { streaming: true, aborting: true, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+    render(<ChatInput />)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(mockAbort).not.toHaveBeenCalled()
+  })
+
+  it('should not abort on Esc when not streaming', () => {
+    activeSessionId.value = 'test-session'
+    runStates.value = {}
+    render(<ChatInput />)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(mockAbort).not.toHaveBeenCalled()
+  })
+
+  it('should not abort on Esc during IME composition', () => {
+    activeSessionId.value = 'test-session'
+    runStates.value = { 'test-session': { streaming: true, aborting: false, runId: 'r1', output: '', reasoning: '', reasoningDone: false, tools: [], agentEvents: [], approval: null, clarify: null, error: null } }
+    render(<ChatInput />)
+    fireEvent.keyDown(document, { key: 'Escape', isComposing: true })
+    expect(mockAbort).not.toHaveBeenCalled()
+  })
 })

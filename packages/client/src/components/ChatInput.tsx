@@ -1,4 +1,4 @@
-import { useRef } from 'preact/hooks'
+import { useRef, useEffect } from 'preact/hooks'
 import { isStreamingHere, aborting, anySessionWorking, send, abort } from '../state/chat.js'
 import { selectedModel, selectedProfile, selectedProvider } from '../state/settings.js'
 import { pendingAttachments, readyAttachments, hasUploading, addFiles, removeAttachment, clearAttachments } from '../state/attachments.js'
@@ -13,6 +13,17 @@ function formatSize(bytes: number): string {
 export function ChatInput() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !e.isComposing && isStreamingHere.value && !aborting.value) {
+        e.preventDefault()
+        abort()
+      }
+    }
+    document.addEventListener('keydown', handleGlobalKeyDown)
+    return () => { document.removeEventListener('keydown', handleGlobalKeyDown) }
+  }, [])
 
   function handleSubmit(e: Event) {
     e.preventDefault()
