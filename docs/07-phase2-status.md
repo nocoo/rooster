@@ -8,8 +8,8 @@ tested, and passing quality gates.
 | Phase | Feature | Key Commits |
 |-------|---------|-------------|
 | 2A | Reasoning/thinking block (collapsible) | `9cb242d`, `a7c5e5e` |
-| 2B | Abort button (stop mid-stream) | `99fc6ee`, `e55d000`, `02e3a21` |
-| 2C | Approval/clarify flow UI | `457667c`, `5560476`, `c70a706`, `29389c6` |
+| 2B | Approval/clarify flow UI | `457667c`, `5560476`, `c70a706`, `29389c6` |
+| 2C | Abort/stop UX hardening | `99fc6ee`, `e55d000`, `02e3a21` |
 | 2D | Auto-scroll + jump-to-bottom | `d7a6959`, `4ca1ed4` |
 | 2E | Code block copy button | `576d1a4`, `e176cf1` |
 | 2F | File attachment (upload) | `d78202f`–`347f9f2` |
