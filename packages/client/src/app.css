@@ -84,7 +84,7 @@ html, body, #app {
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-medium, 0 2px 8px rgba(0, 0, 0, 0.12));
   z-index: 10;
   display: flex;
   align-items: center;
@@ -281,11 +281,12 @@ html, body, #app {
 .session-item {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   padding: 8px 12px;
   border-radius: 6px;
   margin: 2px 0;
   cursor: pointer;
-  gap: 8px;
+  gap: 4px 8px;
   transition: background 0.1s;
 }
 
@@ -336,6 +337,44 @@ html, body, #app {
 .session-item-delete:hover {
   color: var(--fgColor-danger, var(--color-danger-fg));
   background: var(--bgColor-danger-muted, var(--color-danger-subtle));
+}
+
+.session-item-snippet {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--fgColor-muted, var(--color-fg-muted));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.session-item:hover .session-item-actions {
+  opacity: 1;
+}
+
+.session-item-action {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--fgColor-muted, var(--color-fg-muted));
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.session-item-action:hover {
+  color: var(--fgColor-default, var(--color-fg-default));
+  background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
 }
 
 /* Welcome */
@@ -666,7 +705,7 @@ html, body, #app {
     min-width: unset;
     z-index: 100;
     background: var(--bgColor-default, var(--color-canvas-default));
-    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-medium, -2px 0 8px rgba(0, 0, 0, 0.1));
     border-left: 1px solid var(--borderColor-default, var(--color-border-default));
   }
 }
