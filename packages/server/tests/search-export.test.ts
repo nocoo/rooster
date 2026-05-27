@@ -79,11 +79,23 @@ describe('session search and export routes', () => {
       expect(body.results[0]?.snippet).toContain('login')
     })
 
-    it('should search by reasoning content', async () => {
+    it('should search by reasoning content and return reasoning snippet', async () => {
       sessionStore.create({ id: 's1', title: 'Normal session' })
       messageStore.append({ session_id: 's1', role: 'assistant', content: 'result', reasoning: 'I need to analyze the webpack config' })
 
       const res = await app.request('/api/hermes/search/sessions?q=webpack')
+      expect(res.status).toBe(200)
+      const body = await res.json() as { results: Array<{ session: { id: string }; snippet: string | null }>; total: number }
+      expect(body.total).toBe(1)
+      expect(body.results[0]?.session.id).toBe('s1')
+      expect(body.results[0]?.snippet).toContain('webpack')
+    })
+
+    it('should search by session source field', async () => {
+      sessionStore.create({ id: 's1', title: 'Session', source: 'vscode-extension' })
+      messageStore.append({ session_id: 's1', role: 'user', content: 'hi' })
+
+      const res = await app.request('/api/hermes/search/sessions?q=vscode-extension')
       expect(res.status).toBe(200)
       const body = await res.json() as { results: Array<{ session: { id: string } }>; total: number }
       expect(body.total).toBe(1)

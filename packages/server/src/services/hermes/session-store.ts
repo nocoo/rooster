@@ -157,7 +157,11 @@ export class SessionStore {
 
     const rows = this.db.prepare(`
       SELECT DISTINCT s.*,
-        (SELECT substr(m.content, max(1, instr(m.content, ?) - 40), 120)
+        (SELECT
+          CASE
+            WHEN m.content LIKE ? THEN substr(m.content, max(1, instr(m.content, ?) - 40), 120)
+            ELSE substr(m.reasoning, max(1, instr(m.reasoning, ?) - 40), 120)
+          END
          FROM messages m
          WHERE m.session_id = s.id
            AND (m.content LIKE ? OR m.reasoning LIKE ?)
@@ -171,11 +175,12 @@ export class SessionStore {
         OR s.profile LIKE ?
         OR s.model LIKE ?
         OR s.provider LIKE ?
+        OR s.source LIKE ?
         OR m.content LIKE ?
         OR m.reasoning LIKE ?
       ORDER BY s.last_active DESC
       LIMIT ? OFFSET ?
-    `).all(q, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, limit, offset) as Array<Session & { snippet: string | null }>
+    `).all(pattern, q, q, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, limit, offset) as Array<Session & { snippet: string | null }>
 
     return rows.map((row) => {
       const { snippet, ...session } = row
@@ -195,9 +200,10 @@ export class SessionStore {
         OR s.profile LIKE ?
         OR s.model LIKE ?
         OR s.provider LIKE ?
+        OR s.source LIKE ?
         OR m.content LIKE ?
         OR m.reasoning LIKE ?
-    `).get(pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern) as { cnt: number }
+    `).get(pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern) as { cnt: number }
     return row.cnt
   }
 }
