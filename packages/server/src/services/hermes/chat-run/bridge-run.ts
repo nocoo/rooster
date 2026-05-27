@@ -349,7 +349,7 @@ async function resolveAttachments(
     if (!attachment) continue
 
     if (attachment.session_id === null) {
-      deps.attachmentStore.bindToSession(ref.id, sessionId)
+      if (!deps.attachmentStore.bindToSession(ref.id, sessionId)) continue
     } else if (attachment.session_id !== sessionId) {
       continue
     }

@@ -351,4 +351,44 @@ describe('executeBridgeRun — attachments', () => {
     expect(userMsg?.attachments?.[0]?.mime_type).toBe('text/plain')
     expect(userMsg?.attachments?.[0]?.size).toBe(content.length)
   })
+
+  it('should skip pending attachment when bindToSession fails (race lost)', async () => {
+    const captured: { value: unknown } = { value: null }
+    const bridge = createMockBridge(captured)
+    const emitter = { emit: vi.fn() }
+
+    const storedName = 'raced.txt'
+    const content = 'raced content'
+    await writeFile(join(uploadsDir, storedName), content)
+
+    sessionStore.create({ id: 'sess-racer' })
+    const attachment = attachmentStore.create({
+      original_name: 'raced.txt',
+      stored_name: storedName,
+      mime_type: 'text/plain',
+      size: content.length,
+    })
+
+    // Spy on bindToSession to simulate race: get() sees null, but bind fails
+    vi.spyOn(attachmentStore, 'bindToSession').mockReturnValue(false)
+
+    await executeBridgeRun(
+      { bridge, sessionStore, messageStore, attachmentStore, uploadsDir },
+      {
+        input: 'try me',
+        session_id: 'sess-racer',
+        attachments: [{ id: attachment.id, original_name: 'raced.txt', mime_type: 'text/plain', size: content.length }],
+      },
+      emitter,
+      new AbortController().signal,
+    )
+
+    expect(captured.value).toBe('try me')
+
+    const stored = messageStore.list('sess-racer')
+    const userMsg = stored.find((m) => m.role === 'user')
+    expect(userMsg?.attachments).toBeNull()
+
+    vi.restoreAllMocks()
+  })
 })
