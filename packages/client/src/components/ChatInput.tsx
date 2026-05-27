@@ -97,7 +97,7 @@ export function ChatInput() {
           ))}
         </div>
       )}
-      <div class="d-flex gap-3">
+      <div class="d-flex chat-input-row">
         <button
           type="button"
           class="btn-octicon"
@@ -107,7 +107,7 @@ export function ChatInput() {
           title="Attach file"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.5 6.5a.5.5 0 0 1-.5-.5V1.5a2 2 0 0 0-4 0V6a3.5 3.5 0 1 0 7 0V3a.5.5 0 0 1 1 0v3a4.5 4.5 0 1 1-9 0V1.5a3 3 0 0 1 6 0V6a.5.5 0 0 1-.5.5z" />
+            <path d="M12.2 3.02a1.75 1.75 0 0 0-2.48 0L3.9 8.84c-.57.57-.88 1.33-.88 2.13s.31 1.56.88 2.13a3.01 3.01 0 0 0 4.28 0l5.83-5.81a.75.75 0 0 1 1.06 1.06l-5.83 5.81a4.51 4.51 0 0 1-6.34 0 4.51 4.51 0 0 1 0-6.37l5.83-5.82a3.25 3.25 0 0 1 4.58 0 3.25 3.25 0 0 1 0 4.59L7.49 12.38a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l5.83-5.81a.75.75 0 0 1 1.06 1.06l-5.83 5.81a.5.5 0 0 0 0 .71.5.5 0 0 0 .71 0l5.83-5.82a1.75 1.75 0 0 0-.04-2.48Z" />
           </svg>
         </button>
         <input

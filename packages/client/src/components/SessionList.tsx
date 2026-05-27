@@ -54,6 +54,7 @@ export function SessionList() {
         value={searchQuery.value}
         onInput={handleSearchInput}
         aria-label="Search sessions"
+        style={{ width: '100%' }}
       />
       {searching && sLoading && (
         <p class="color-fg-muted f6">Searching…</p>

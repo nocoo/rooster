@@ -6,7 +6,7 @@ export function HeaderSettings() {
   const providerList = providers.value
 
   return (
-    <div class="d-flex gap-2 flex-items-center">
+    <div class="d-flex gap-3 flex-items-center">
       <select
         class="form-select form-select-sm"
         aria-label="Profile"
