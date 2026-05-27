@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll, beforeAll } from 'vitest'
 import net from 'node:net'
-import { AgentBridgeClient, AgentBridgeError, getBridgeClient } from '../src/services/hermes/agent-bridge.js'
+import { AgentBridgeClient, AgentBridgeError, getBridgeClient } from '../../src/services/hermes/agent-bridge.js'
 
 function createMockServer(socketPath: string, handler: (request: Record<string, unknown>, conn: net.Socket) => void): net.Server {
   const server = net.createServer((conn) => {

@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client'
-import { createHttpServer, type HttpServer } from '../src/server.js'
-import { createDb } from '../src/services/hermes/db.js'
-import type { AgentBridgeClient, AgentBridgeChatStarted, AgentBridgeOutput, AgentBridgeResponse } from '../src/services/hermes/agent-bridge.js'
+import { createHttpServer, type HttpServer } from '../../src/server.js'
+import { createDb } from '../../src/services/hermes/db.js'
+import type { AgentBridgeClient, AgentBridgeChatStarted, AgentBridgeOutput, AgentBridgeResponse } from '../../src/services/hermes/agent-bridge.js'
 import type { AddressInfo } from 'node:net'
 
 function createMockBridge(): AgentBridgeClient {
