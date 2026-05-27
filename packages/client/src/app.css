@@ -34,6 +34,20 @@ html, body, #app {
   gap: 8px;
 }
 
+.header-settings {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 8px;
+}
+
+.bridge-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
 .bridge-status-dot {
   width: 8px;
   height: 8px;

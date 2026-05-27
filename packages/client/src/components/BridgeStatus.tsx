@@ -17,7 +17,7 @@ export function BridgeStatus() {
         : 'var(--fgColor-muted, var(--color-fg-muted, #656d76))'
 
   return (
-    <span class="d-flex flex-items-center gap-2 f6 color-fg-muted" aria-label={`Bridge status: ${label}`}>
+    <span class="bridge-status" aria-label={`Bridge status: ${label}`}>
       <span
         class="bridge-status-dot"
         style={{ backgroundColor: color }}
