@@ -3,6 +3,7 @@ import { useSignal } from '@preact/signals'
 import { messages, loading, activeSession } from '../state/sessions.js'
 import { isStreamingHere, chatError, pendingApproval, pendingClarify, activeCompressionState } from '../state/chat.js'
 import { ChatInput } from './ChatInput.js'
+import { SessionHeader } from './SessionHeader.js'
 import { StreamingMessage } from './StreamingMessage.js'
 import { ToolTrace } from './ToolTrace.js'
 import { AgentStatusBar } from './AgentStatusBar.js'
@@ -88,6 +89,7 @@ export function MessageHistory() {
 
   return (
     <div class="app-chat">
+      <SessionHeader />
       <div class="chat-messages" ref={containerRef} onScroll={handleScroll}>
         <div ref={contentRef}>
           {msgs.length === 0 && !isStreamingHere.value && (

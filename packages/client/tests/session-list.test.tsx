@@ -23,7 +23,6 @@ vi.mock('../src/api/sessions.js', () => ({
   deleteSession: vi.fn().mockResolvedValue(undefined),
   renameSession: vi.fn().mockResolvedValue(undefined),
   searchSessions: (...args: unknown[]) => mockSearchSessions(...args) as unknown,
-  getExportUrl: (id: string, format: string) => `/api/hermes/sessions/${id}/export?format=${format}`,
 }))
 
 const mockRoute = vi.fn()
@@ -86,23 +85,6 @@ describe('SessionList', () => {
     expect(activeItem).toBeTruthy()
   })
 
-  it('should remove session on delete button click', async () => {
-    sessions.value = [
-      { id: 's1', title: 'To Delete', started_at: '2025-01-01', last_active: new Date().toISOString() },
-      { id: 's2', title: 'Keep', started_at: '2025-01-02', last_active: new Date().toISOString() },
-    ]
-
-    render(<SessionList />)
-    const deleteButtons = screen.getAllByLabelText('Delete session')
-    const firstBtn = deleteButtons[0]
-    if (firstBtn) fireEvent.click(firstBtn)
-
-    // Wait for async removeSession to complete
-    await new Promise((r) => { setTimeout(r, 10) })
-
-    expect(sessions.value).toHaveLength(1)
-    expect(sessions.value[0]?.id).toBe('s2')
-  })
 
   it('should display relative time for recent sessions', () => {
     const now = new Date()
@@ -201,35 +183,6 @@ describe('SessionList', () => {
     expect(searchResults.value).toHaveLength(0)
   })
 
-  it('should have export buttons on session items', () => {
-    sessions.value = [
-      { id: 's1', title: 'Export Me', started_at: '2025-01-01', last_active: new Date().toISOString() },
-    ]
-
-    render(<SessionList />)
-    expect(screen.getByLabelText('Export JSON')).toBeTruthy()
-    expect(screen.getByLabelText('Export Markdown')).toBeTruthy()
-  })
-
-  it('should trigger download on export JSON click', () => {
-    sessions.value = [
-      { id: 's1abcdef', title: 'Export', started_at: '2025-01-01', last_active: new Date().toISOString() },
-    ]
-
-    const { container } = render(<SessionList />)
-    const btn = container.querySelector('[aria-label="Export JSON"]') as HTMLElement
-    expect(() => { fireEvent.click(btn) }).not.toThrow()
-  })
-
-  it('should trigger download on export Markdown click', () => {
-    sessions.value = [
-      { id: 's1abcdef', title: 'Export', started_at: '2025-01-01', last_active: new Date().toISOString() },
-    ]
-
-    const { container } = render(<SessionList />)
-    const btn = container.querySelector('[aria-label="Export Markdown"]') as HTMLElement
-    expect(() => { fireEvent.click(btn) }).not.toThrow()
-  })
 
   it('should call performSearch on input change', async () => {
     mockSearchSessions.mockResolvedValue({ results: [], total: 0 })

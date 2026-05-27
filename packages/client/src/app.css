@@ -277,6 +277,45 @@ html, body, #app {
   font-weight: 600;
 }
 
+/* Session header (chat area top bar) */
+.session-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--borderColor-default, var(--color-border-default));
+  min-height: 40px;
+  flex-shrink: 0;
+}
+
+.session-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.session-header-title {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-header-time {
+  font-size: 12px;
+  color: var(--fgColor-muted, var(--color-fg-muted));
+  white-space: nowrap;
+}
+
+.session-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 /* Sessions sidebar */
 .session-item {
   display: flex;

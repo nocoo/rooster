@@ -2,7 +2,6 @@ import { route } from 'preact-router'
 import {
   sessions,
   activeSessionId,
-  removeSession,
   searchQuery,
   searchResults,
   searchLoading,
@@ -11,7 +10,6 @@ import {
   performSearch,
   clearSearch,
 } from '../state/sessions.js'
-import { getExportUrl } from '../api/sessions.js'
 
 function startNewChat() {
   activeSessionId.value = null
@@ -21,14 +19,6 @@ function startNewChat() {
 function handleSearchInput(e: Event) {
   const value = (e.target as HTMLInputElement).value
   void performSearch(value)
-}
-
-function handleExport(sessionId: string, format: 'json' | 'markdown') {
-  const url = getExportUrl(sessionId, format)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `session-${sessionId.slice(0, 8)}.${format === 'json' ? 'json' : 'md'}`
-  a.click()
 }
 
 export function SessionList() {
@@ -101,43 +91,6 @@ export function SessionList() {
             {session.title ?? `Chat ${session.id.slice(0, 8)}`}
           </span>
           <span class="session-item-time">{formatDate(session.last_active)}</span>
-          <div class="session-item-actions">
-            <button
-              class="session-item-action"
-              type="button"
-              aria-label="Export JSON"
-              title="Export JSON"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleExport(session.id, 'json')
-              }}
-            >
-              &#x21E9;
-            </button>
-            <button
-              class="session-item-action"
-              type="button"
-              aria-label="Export Markdown"
-              title="Export Markdown"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleExport(session.id, 'markdown')
-              }}
-            >
-              MD
-            </button>
-            <button
-              class="session-item-delete"
-              type="button"
-              aria-label="Delete session"
-              onClick={(e) => {
-                e.stopPropagation()
-                void removeSession(session.id)
-              }}
-            >
-              &times;
-            </button>
-          </div>
         </div>
       ))}
     </div>
