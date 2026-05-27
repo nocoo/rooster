@@ -67,7 +67,7 @@ export async function executeBridgeRun(
     }))
   }
 
-  const message = await buildBridgeMessage(payload, deps)
+  const message = await buildBridgeMessage(payload, deps, sessionId)
   const chatStarted = await bridge.chat(sessionId, message, chatOptions)
 
   const runId = chatStarted.run_id
@@ -327,6 +327,7 @@ const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp
 async function buildBridgeMessage(
   payload: RunPayload,
   deps: BridgeRunDeps,
+  sessionId: string,
 ): Promise<string | Array<Record<string, unknown>>> {
   if (!payload.attachments || payload.attachments.length === 0 || !deps.attachmentStore || !deps.uploadsDir) {
     return payload.input
@@ -337,6 +338,12 @@ async function buildBridgeMessage(
   for (const ref of payload.attachments) {
     const attachment = deps.attachmentStore.get(ref.id)
     if (!attachment) continue
+
+    if (attachment.session_id === null) {
+      deps.attachmentStore.bindToSession(ref.id, sessionId)
+    } else if (attachment.session_id !== sessionId) {
+      continue
+    }
 
     const filePath = join(deps.uploadsDir, attachment.stored_name)
     const buffer = await readFile(filePath)
@@ -362,6 +369,7 @@ async function buildBridgeMessage(
     }
   }
 
+  if (contentBlocks.length === 0) return payload.input
   contentBlocks.push({ type: 'text', text: payload.input })
   return contentBlocks
 }

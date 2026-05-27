@@ -208,10 +208,7 @@ describe('executeBridgeRun — attachments', () => {
       new AbortController().signal,
     )
 
-    const msg = captured.value as Array<Record<string, unknown>>
-    expect(Array.isArray(msg)).toBe(true)
-    expect(msg).toHaveLength(1)
-    expect(msg[0]).toMatchObject({ type: 'text', text: 'hi' })
+    expect(captured.value).toBe('hi')
   })
 
   it('should fall back to plain string when attachmentStore not provided', async () => {
@@ -233,5 +230,109 @@ describe('executeBridgeRun — attachments', () => {
     )
 
     expect(captured.value).toBe('hello')
+  })
+
+  it('should reject attachment belonging to a different session', async () => {
+    const captured: { value: unknown } = { value: null }
+    const bridge = createMockBridge(captured)
+    const emitter = { emit: vi.fn() }
+
+    const storedName = 'other-session.png'
+    await writeFile(join(uploadsDir, storedName), Buffer.from([0x89, 0x50]))
+
+    sessionStore.create({ id: 'sess-A' })
+    sessionStore.create({ id: 'sess-B' })
+    const attachment = attachmentStore.create({
+      session_id: 'sess-A',
+      original_name: 'secret.png',
+      stored_name: storedName,
+      mime_type: 'image/png',
+      size: 2,
+    })
+
+    await executeBridgeRun(
+      { bridge, sessionStore, messageStore, attachmentStore, uploadsDir },
+      {
+        input: 'show me',
+        session_id: 'sess-B',
+        attachments: [{ id: attachment.id, original_name: 'secret.png', mime_type: 'image/png', size: 2 }],
+      },
+      emitter,
+      new AbortController().signal,
+    )
+
+    expect(captured.value).toBe('show me')
+  })
+
+  it('should bind pending attachment (session_id=null) to current session and inject', async () => {
+    const captured: { value: unknown } = { value: null }
+    const bridge = createMockBridge(captured)
+    const emitter = { emit: vi.fn() }
+
+    const storedName = 'pending-upload.txt'
+    const content = 'pending file content'
+    await writeFile(join(uploadsDir, storedName), content)
+
+    sessionStore.create({ id: 'sess-new' })
+    const attachment = attachmentStore.create({
+      original_name: 'upload.txt',
+      stored_name: storedName,
+      mime_type: 'text/plain',
+      size: content.length,
+    })
+
+    expect(attachmentStore.get(attachment.id)?.session_id).toBeNull()
+
+    await executeBridgeRun(
+      { bridge, sessionStore, messageStore, attachmentStore, uploadsDir },
+      {
+        input: 'process this',
+        session_id: 'sess-new',
+        attachments: [{ id: attachment.id, original_name: 'upload.txt', mime_type: 'text/plain', size: content.length }],
+      },
+      emitter,
+      new AbortController().signal,
+    )
+
+    const msg = captured.value as Array<Record<string, unknown>>
+    expect(Array.isArray(msg)).toBe(true)
+    expect(msg[0]).toMatchObject({ type: 'text', text: '[File: upload.txt]\npending file content' })
+    expect(msg[1]).toMatchObject({ type: 'text', text: 'process this' })
+
+    expect(attachmentStore.get(attachment.id)?.session_id).toBe('sess-new')
+  })
+
+  it('should use DB metadata not payload metadata for bridge message', async () => {
+    const captured: { value: unknown } = { value: null }
+    const bridge = createMockBridge(captured)
+    const emitter = { emit: vi.fn() }
+
+    const storedName = 'db-meta.txt'
+    const content = 'real content'
+    await writeFile(join(uploadsDir, storedName), content)
+
+    sessionStore.create({ id: 'sess-att' })
+    const attachment = attachmentStore.create({
+      session_id: 'sess-att',
+      original_name: 'real-name.txt',
+      stored_name: storedName,
+      mime_type: 'text/plain',
+      size: content.length,
+    })
+
+    await executeBridgeRun(
+      { bridge, sessionStore, messageStore, attachmentStore, uploadsDir },
+      {
+        input: 'go',
+        session_id: 'sess-att',
+        attachments: [{ id: attachment.id, original_name: 'FAKE-NAME.txt', mime_type: 'image/png', size: 9999 }],
+      },
+      emitter,
+      new AbortController().signal,
+    )
+
+    const msg = captured.value as Array<Record<string, unknown>>
+    expect(Array.isArray(msg)).toBe(true)
+    expect(msg[0]).toMatchObject({ type: 'text', text: '[File: real-name.txt]\nreal content' })
   })
 })

@@ -49,4 +49,8 @@ export class AttachmentStore {
     const result = this.db.prepare('DELETE FROM attachments WHERE id = ?').run(id)
     return result.changes > 0
   }
+
+  bindToSession(id: string, sessionId: string): void {
+    this.db.prepare('UPDATE attachments SET session_id = ? WHERE id = ? AND session_id IS NULL').run(sessionId, id)
+  }
 }
