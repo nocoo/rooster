@@ -15,7 +15,7 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p packages/server --noEmit && tsc -p packages/client --noEmit && tsc --noEmit",
     "gate:security": "tsx scripts/run-security.ts",
-    "gate:routes": "tsx scripts/check-route-coverage.ts",
+    "gate:routes": "tsx scripts/check-route-coverage.ts --strict",
     "prepare": "husky"
   },
   "lint-staged": {
