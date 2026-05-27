@@ -58,7 +58,7 @@ export async function searchSessions(q: string, opts?: {
   params.set('q', q)
   if (opts?.limit !== undefined) params.set('limit', String(opts.limit))
   if (opts?.offset !== undefined) params.set('offset', String(opts.offset))
-  return api.get<SearchResponse>(`/api/hermes/sessions/search?${params.toString()}`)
+  return api.get<SearchResponse>(`/api/hermes/search/sessions?${params.toString()}`)
 }
 
 export function getExportUrl(sessionId: string, format: 'json' | 'markdown'): string {

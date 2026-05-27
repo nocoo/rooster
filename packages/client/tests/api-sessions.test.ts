@@ -119,23 +119,23 @@ describe('sessions API', () => {
   })
 
   describe('searchSessions', () => {
-    it('should call GET /api/hermes/sessions/search with q param', async () => {
+    it('should call GET /api/hermes/search/sessions with q param', async () => {
       mockGet.mockResolvedValue({ results: [], total: 0 })
       const result = await searchSessions('hello')
-      expect(mockGet).toHaveBeenCalledWith('/api/hermes/sessions/search?q=hello')
+      expect(mockGet).toHaveBeenCalledWith('/api/hermes/search/sessions?q=hello')
       expect(result).toEqual({ results: [], total: 0 })
     })
 
     it('should include limit and offset params', async () => {
       mockGet.mockResolvedValue({ results: [], total: 0 })
       await searchSessions('test', { limit: 10, offset: 5 })
-      expect(mockGet).toHaveBeenCalledWith('/api/hermes/sessions/search?q=test&limit=10&offset=5')
+      expect(mockGet).toHaveBeenCalledWith('/api/hermes/search/sessions?q=test&limit=10&offset=5')
     })
 
     it('should only include provided optional params', async () => {
       mockGet.mockResolvedValue({ results: [], total: 0 })
       await searchSessions('query', { limit: 15 })
-      expect(mockGet).toHaveBeenCalledWith('/api/hermes/sessions/search?q=query&limit=15')
+      expect(mockGet).toHaveBeenCalledWith('/api/hermes/search/sessions?q=query&limit=15')
     })
   })
 

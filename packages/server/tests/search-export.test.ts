@@ -35,21 +35,21 @@ describe('session search and export routes', () => {
     app = createApp({ db, bridge })
   })
 
-  describe('GET /api/hermes/sessions/search', () => {
+  describe('GET /api/hermes/search/sessions', () => {
     it('should return 400 when q is missing', async () => {
-      const res = await app.request('/api/hermes/sessions/search')
+      const res = await app.request('/api/hermes/search/sessions')
       expect(res.status).toBe(400)
       const body = await res.json() as { error: string }
       expect(body.error).toContain('"q" is required')
     })
 
     it('should return 400 when q is empty', async () => {
-      const res = await app.request('/api/hermes/sessions/search?q=')
+      const res = await app.request('/api/hermes/search/sessions?q=')
       expect(res.status).toBe(400)
     })
 
     it('should return 400 when q is whitespace only', async () => {
-      const res = await app.request('/api/hermes/sessions/search?q=%20%20')
+      const res = await app.request('/api/hermes/search/sessions?q=%20%20')
       expect(res.status).toBe(400)
     })
 
@@ -59,7 +59,7 @@ describe('session search and export routes', () => {
       messageStore.append({ session_id: 's1', role: 'user', content: 'hello' })
       messageStore.append({ session_id: 's2', role: 'user', content: 'world' })
 
-      const res = await app.request('/api/hermes/sessions/search?q=authentication')
+      const res = await app.request('/api/hermes/search/sessions?q=authentication')
       expect(res.status).toBe(200)
       const body = await res.json() as { results: Array<{ session: { id: string }; snippet: string | null }>; total: number }
       expect(body.total).toBe(1)
@@ -72,7 +72,7 @@ describe('session search and export routes', () => {
       messageStore.append({ session_id: 's1', role: 'user', content: 'Please fix the login flow' })
       messageStore.append({ session_id: 's1', role: 'assistant', content: 'I will fix it now' })
 
-      const res = await app.request('/api/hermes/sessions/search?q=login')
+      const res = await app.request('/api/hermes/search/sessions?q=login')
       expect(res.status).toBe(200)
       const body = await res.json() as { results: Array<{ session: { id: string }; snippet: string | null }>; total: number }
       expect(body.total).toBe(1)
@@ -83,7 +83,7 @@ describe('session search and export routes', () => {
       sessionStore.create({ id: 's1', title: 'Normal session' })
       messageStore.append({ session_id: 's1', role: 'assistant', content: 'result', reasoning: 'I need to analyze the webpack config' })
 
-      const res = await app.request('/api/hermes/sessions/search?q=webpack')
+      const res = await app.request('/api/hermes/search/sessions?q=webpack')
       expect(res.status).toBe(200)
       const body = await res.json() as { results: Array<{ session: { id: string } }>; total: number }
       expect(body.total).toBe(1)
@@ -94,7 +94,7 @@ describe('session search and export routes', () => {
       sessionStore.create({ id: 's1', title: 'Something' })
       messageStore.append({ session_id: 's1', role: 'user', content: 'hello' })
 
-      const res = await app.request('/api/hermes/sessions/search?q=nonexistent')
+      const res = await app.request('/api/hermes/search/sessions?q=nonexistent')
       expect(res.status).toBe(200)
       const body = await res.json() as { results: unknown[]; total: number }
       expect(body.total).toBe(0)
@@ -107,30 +107,30 @@ describe('session search and export routes', () => {
         messageStore.append({ session_id: `s${String(i)}`, role: 'user', content: 'search me' })
       }
 
-      const res = await app.request('/api/hermes/sessions/search?q=search&limit=2&offset=0')
+      const res = await app.request('/api/hermes/search/sessions?q=search&limit=2&offset=0')
       expect(res.status).toBe(200)
       const body = await res.json() as { results: unknown[]; total: number }
       expect(body.results).toHaveLength(2)
       expect(body.total).toBe(5)
 
-      const res2 = await app.request('/api/hermes/sessions/search?q=search&limit=2&offset=2')
+      const res2 = await app.request('/api/hermes/search/sessions?q=search&limit=2&offset=2')
       const body2 = await res2.json() as { results: unknown[]; total: number }
       expect(body2.results).toHaveLength(2)
     })
 
-    it('should cap limit at 100', async () => {
+    it('should reject limit exceeding 100 with 400', async () => {
       sessionStore.create({ id: 's1', title: 'Target' })
       messageStore.append({ session_id: 's1', role: 'user', content: 'match' })
 
-      const res = await app.request('/api/hermes/sessions/search?q=match&limit=999')
-      expect(res.status).toBe(200)
+      const res = await app.request('/api/hermes/search/sessions?q=match&limit=999')
+      expect(res.status).toBe(400)
     })
 
     it('should search by profile', async () => {
       sessionStore.create({ id: 's1', title: 'Session', profile: 'coding-assistant' })
       messageStore.append({ session_id: 's1', role: 'user', content: 'hi' })
 
-      const res = await app.request('/api/hermes/sessions/search?q=coding-assistant')
+      const res = await app.request('/api/hermes/search/sessions?q=coding-assistant')
       expect(res.status).toBe(200)
       const body = await res.json() as { results: Array<{ session: { id: string } }>; total: number }
       expect(body.total).toBe(1)
@@ -141,7 +141,7 @@ describe('session search and export routes', () => {
       sessionStore.create({ id: 's1', title: 'Fix 100% bug' })
       messageStore.append({ session_id: 's1', role: 'user', content: 'test' })
 
-      const res = await app.request('/api/hermes/sessions/search?q=100%25')
+      const res = await app.request('/api/hermes/search/sessions?q=100%25')
       expect(res.status).toBe(200)
       const body = await res.json() as { results: Array<{ session: { id: string } }>; total: number }
       expect(body.total).toBe(1)
@@ -152,11 +152,59 @@ describe('session search and export routes', () => {
       messageStore.append({ session_id: 's1', role: 'user', content: 'deploy the app' })
       messageStore.append({ session_id: 's1', role: 'assistant', content: 'deploying now' })
 
-      const res = await app.request('/api/hermes/sessions/search?q=deploy')
+      const res = await app.request('/api/hermes/search/sessions?q=deploy')
       expect(res.status).toBe(200)
       const body = await res.json() as { results: Array<{ session: { id: string } }>; total: number }
       expect(body.total).toBe(1)
       expect(body.results).toHaveLength(1)
+    })
+
+    it('should also work on alias path /api/hermes/sessions/search', async () => {
+      sessionStore.create({ id: 's1', title: 'Alias test' })
+      messageStore.append({ session_id: 's1', role: 'user', content: 'find me' })
+
+      const res = await app.request('/api/hermes/sessions/search?q=Alias')
+      expect(res.status).toBe(200)
+      const body = await res.json() as { results: Array<{ session: { id: string } }>; total: number }
+      expect(body.total).toBe(1)
+      expect(body.results[0]?.session.id).toBe('s1')
+    })
+
+    it('should return 400 for non-integer limit', async () => {
+      sessionStore.create({ id: 's1', title: 'Test' })
+      messageStore.append({ session_id: 's1', role: 'user', content: 'hi' })
+
+      const res = await app.request('/api/hermes/search/sessions?q=test&limit=abc')
+      expect(res.status).toBe(400)
+      const body = await res.json() as { error: string }
+      expect(body.error).toContain('limit')
+    })
+
+    it('should return 400 for negative limit', async () => {
+      const res = await app.request('/api/hermes/search/sessions?q=test&limit=-1')
+      expect(res.status).toBe(400)
+    })
+
+    it('should return 400 for limit exceeding 100', async () => {
+      const res = await app.request('/api/hermes/search/sessions?q=test&limit=101')
+      expect(res.status).toBe(400)
+    })
+
+    it('should return 400 for non-integer offset', async () => {
+      const res = await app.request('/api/hermes/search/sessions?q=test&offset=xyz')
+      expect(res.status).toBe(400)
+      const body = await res.json() as { error: string }
+      expect(body.error).toContain('offset')
+    })
+
+    it('should return 400 for negative offset', async () => {
+      const res = await app.request('/api/hermes/search/sessions?q=test&offset=-5')
+      expect(res.status).toBe(400)
+    })
+
+    it('should return 400 for float limit', async () => {
+      const res = await app.request('/api/hermes/search/sessions?q=test&limit=2.5')
+      expect(res.status).toBe(400)
     })
   })
 

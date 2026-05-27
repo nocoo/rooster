@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import type { SessionStore } from '../services/hermes/session-store.js'
 import type { MessageStore } from '../services/hermes/message-store.js'
 import type { AgentBridgeClient } from '../services/hermes/agent-bridge.js'
@@ -10,21 +11,46 @@ export interface SessionRouteDeps {
   bridge: AgentBridgeClient
 }
 
-export function createSessionRoutes(deps: SessionRouteDeps): Hono {
-  const { sessionStore, messageStore, bridge } = deps
-  const routes = new Hono()
+function validateIntParam(value: string | undefined, fallback: number, min: number, max: number): number | null {
+  if (value === undefined) return fallback
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) return null
+  if (parsed < min || parsed > max) return null
+  return parsed
+}
 
-  routes.get('/search', (c) => {
+function createSearchHandler(sessionStore: SessionStore) {
+  return (c: Context) => {
     const q = c.req.query('q')
     if (!q || q.trim() === '') {
       return c.json({ error: 'Query parameter "q" is required' }, 400)
     }
-    const limit = Math.min(parseInt(c.req.query('limit') ?? '20', 10), 100)
-    const offset = parseInt(c.req.query('offset') ?? '0', 10)
+    const limit = validateIntParam(c.req.query('limit'), 20, 1, 100)
+    if (limit === null) {
+      return c.json({ error: 'Invalid "limit" parameter: must be an integer between 1 and 100' }, 400)
+    }
+    const offset = validateIntParam(c.req.query('offset'), 0, 0, 100000)
+    if (offset === null) {
+      return c.json({ error: 'Invalid "offset" parameter: must be a non-negative integer' }, 400)
+    }
     const results = sessionStore.search({ q: q.trim(), limit, offset })
     const total = sessionStore.searchCount(q.trim())
     return c.json({ results, total })
-  })
+  }
+}
+
+export function createSearchRoutes(deps: Pick<SessionRouteDeps, 'sessionStore'>): Hono {
+  const routes = new Hono()
+  routes.get('/sessions', createSearchHandler(deps.sessionStore))
+  return routes
+}
+
+export function createSessionRoutes(deps: SessionRouteDeps): Hono {
+  const { sessionStore, messageStore, bridge } = deps
+  const routes = new Hono()
+
+  // Alias: /api/hermes/sessions/search (backwards compat)
+  routes.get('/search', createSearchHandler(sessionStore))
 
   routes.get('/', (c) => {
     const limit = parseInt(c.req.query('limit') ?? '50', 10)
