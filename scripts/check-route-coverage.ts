@@ -166,9 +166,10 @@ function scanE2e(): E2eHits {
 }
 
 function extractPathFromUrl(raw: string): string | undefined {
-  const m = /^https?:\/\/[^/]+(\/.*)$/.exec(raw)
-  if (!m) return raw.startsWith('/') ? raw : undefined
-  const path = m[1] ?? ''
+  const stripped = raw.replace(/^\$\{[^}]+\}/, '')
+  const m = /^https?:\/\/[^/]+(\/.*)$/.exec(stripped)
+  const path = m ? (m[1] ?? '') : stripped
+  if (!path.startsWith('/')) return undefined
   const cleaned = path.replace(/\$\{[^}]+\}/g, '_')
   return cleaned.split('?')[0]
 }
