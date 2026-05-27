@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# pre-push: G2 (Security gate) — Phase 1 of 6DQ improvement.
+# L2 will be added in Phase 2.
+set -euo pipefail
+
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=../scripts/ensure-tools.sh
+source "$HOOK_DIR/../scripts/ensure-tools.sh"
+require_tool osv-scanner "dependency CVE scan"
+require_tool gitleaks "secrets scanning"
+
+echo "🐓 rooster pre-push — G2"
+bun run gate:security
