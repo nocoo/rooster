@@ -1062,6 +1062,32 @@ html, body, #app {
   border-bottom: none;
 }
 
+.admin-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-checklist-item {
+  padding: 10px 12px;
+  border: 1px solid var(--borderColor-default, var(--color-border-default));
+  border-radius: 6px;
+  background: var(--bgColor-default, var(--color-canvas-default));
+  letter-spacing: 0;
+}
+
+.admin-checklist-label {
+  font-size: 13px;
+}
+
+.admin-checklist-detail {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
 .clarify-input {
   display: flex;
   align-items: center;

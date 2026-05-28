@@ -112,11 +112,11 @@ describe('Admin shell', () => {
     expect(overview.getAttribute('aria-current')).toBeNull()
   })
 
-  it('renders a known section placeholder without 404 at /admin/skills', async () => {
+  it('renders a known section placeholder without 404 at /admin/plugins', async () => {
     const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/skills" />)
+    render(<App url="/admin/plugins" />)
 
-    expect(screen.getByRole('heading', { name: 'Skills' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Plugins' })).toBeTruthy()
     expect(screen.getByText(/ships in a later phase/i)).toBeTruthy()
   })
 
