@@ -1696,6 +1696,8 @@ describe('Socket.IO /chat-run', () => {
       connectClient()
     })
 
+    // GitHub runners do real websocket + tmp-file I/O slower than dev machines;
+    // bump this case's timeout to absorb runner jitter without masking real hangs.
     it('should persist attachments on user message when provided', async () => {
       const { writeFile } = await import('node:fs/promises')
       const { join } = await import('node:path')
@@ -1731,7 +1733,7 @@ describe('Socket.IO /chat-run', () => {
       expect(msgs[0]?.attachments).toEqual([
         { id: attId, original_name: 'doc.pdf', mime_type: 'application/pdf', size: 2048 },
       ])
-    })
+    }, 15000)
 
     it('should not set attachments on user message when not provided', async () => {
       await new Promise<void>((resolve) => {
