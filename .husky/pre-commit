@@ -1,1 +1,1 @@
-bun run lint && bun run typecheck && bun run test:coverage
+bun run gate:isolation && bun run lint && bun run typecheck && bun run test:coverage
