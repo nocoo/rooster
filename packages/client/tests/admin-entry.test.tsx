@@ -2,8 +2,9 @@
  * @vitest-environment happy-dom
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/preact'
+import { render, screen, cleanup, fireEvent } from '@testing-library/preact'
 import { activeSessionId, messages, loading } from '../src/state/sessions.js'
+import { debugEnabled, debugEvents } from '../src/state/debug.js'
 
 const mockFetchSessions = vi.fn()
 const mockFetchMessages = vi.fn()
@@ -34,6 +35,8 @@ describe('App header admin entry', () => {
     activeSessionId.value = null
     messages.value = []
     loading.value = false
+    debugEnabled.value = false
+    debugEvents.value = []
     mockFetchSessions.mockReset()
     mockFetchSessions.mockResolvedValue({ sessions: [], total: 0 })
     mockFetchMessages.mockReset()
@@ -76,5 +79,17 @@ describe('App header admin entry', () => {
 
     const entry = screen.getByRole('link', { name: 'Open admin' })
     expect(entry.getAttribute('aria-current')).toBe('page')
+  })
+
+  it('renders the DebugPanel when toggled on under /admin', async () => {
+    const { App } = await import('../src/pages/App.js')
+    const { container } = render(<App url="/admin" />)
+
+    expect(container.querySelector('.debug-panel')).toBeNull()
+
+    const toggle = screen.getByLabelText('Toggle debug panel')
+    fireEvent.click(toggle)
+
+    expect(container.querySelector('.debug-panel')).toBeTruthy()
   })
 })

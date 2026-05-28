@@ -122,8 +122,15 @@ describe('Admin shell', () => {
 
   it('renders an Unknown admin section placeholder for unknown slugs', async () => {
     const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/whatever" />)
+    const { container } = render(<App url="/admin/whatever" />)
 
     expect(screen.getByRole('heading', { name: /Unknown admin section/i })).toBeTruthy()
+
+    const sidebar = container.querySelector('.admin-sidebar') as HTMLElement
+    const navLinks = sidebar.querySelectorAll('a.admin-nav-link')
+    expect(navLinks.length).toBe(10)
+    for (const link of navLinks) {
+      expect(link.getAttribute('aria-current')).toBeNull()
+    }
   })
 })

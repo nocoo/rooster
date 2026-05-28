@@ -17,7 +17,7 @@ export const ADMIN_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
   { slug: 'settings', label: 'Settings', icon: '⛭' },
 ]
 
-export function AdminSidebar({ activeSlug }: { activeSlug: string }) {
+export function AdminSidebar({ activeSlug }: { activeSlug: string | null }) {
   return (
     <nav class="admin-sidebar" aria-label="Admin navigation">
       <ul class="admin-nav-list">

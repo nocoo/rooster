@@ -143,9 +143,9 @@ export function App({ url }: { url?: string }) {
                 <ChatPage path="/session/:id" />
               </Router>
             </div>
-            <DebugPanel />
           </>
         )}
+        <DebugPanel />
       </div>
     </div>
   )

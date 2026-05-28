@@ -46,7 +46,8 @@ function AdminSectionPlaceholder({ slug }: { slug: string }) {
 export function AdminLayout({ section }: { path?: string; section?: string }) {
   const slug = section ?? ''
   const knownSlugs = new Set(ADMIN_NAV_ITEMS.map((item) => item.slug))
-  const activeSlug = knownSlugs.has(slug) ? slug : ''
+  const isKnown = knownSlugs.has(slug)
+  const activeSlug = isKnown ? slug : null
 
   return (
     <div class="admin-layout">
