@@ -29,7 +29,7 @@ vi.mock('../src/api/health.js', () => ({
   fetchHealth: vi.fn().mockResolvedValue({ status: 'ok', timestamp: '', bridge: 'connected' }),
 }))
 
-describe('Admin plugins route', () => {
+describe('Admin memory route', () => {
   beforeEach(() => {
     activeSessionId.value = null
     messages.value = []
@@ -43,9 +43,9 @@ describe('Admin plugins route', () => {
     cleanup()
   })
 
-  it('renders AdminPluginsPage at /admin/plugins instead of the phase placeholder', async () => {
+  it('renders AdminMemoryPage at /admin/memory instead of the phase placeholder', async () => {
     const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/plugins" />)
+    render(<App url="/admin/memory" />)
 
     expect(screen.getByText(/Protocol not ready/i)).toBeTruthy()
     expect(screen.queryByText(/ships in a later phase/i)).toBeNull()

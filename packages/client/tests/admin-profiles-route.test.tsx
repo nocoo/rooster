@@ -57,9 +57,9 @@ describe('Admin profiles route', () => {
     expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
   })
 
-  it('keeps the phase placeholder for other admin slugs (e.g. /admin/memory)', async () => {
+  it('keeps the phase placeholder for other admin slugs (e.g. /admin/models)', async () => {
     const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/memory" />)
+    render(<App url="/admin/models" />)
 
     expect(screen.getByText(/ships in a later phase/i)).toBeTruthy()
     expect(screen.queryByText(/Read-only preview/i)).toBeNull()
