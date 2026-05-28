@@ -13,22 +13,53 @@ html, body, #app {
 }
 
 .app-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   height: 48px;
   padding: 0 16px;
+  gap: 16px;
   border-bottom: 1px solid var(--borderColor-default, var(--color-border-default));
   background: var(--bgColor-default, var(--color-canvas-default));
 }
 
-.app-header-left {
+.app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fgColor-default, var(--color-fg-default));
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  border-radius: 6px;
+}
+
+.app-brand:hover {
+  background: var(--bgColor-neutral-muted, var(--color-neutral-subtle));
+  text-decoration: none;
+}
+
+.app-brand-mark {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.app-brand-name {
+  letter-spacing: -0.01em;
+}
+
+.app-header-settings {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
 }
 
-.app-header-right {
+.app-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -38,14 +69,12 @@ html, body, #app {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-left: 8px;
 }
 
 .bridge-status {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: 8px;
 }
 
 .bridge-status-dot {
@@ -741,6 +770,10 @@ html, body, #app {
     min-width: 200px;
   }
 
+  .bridge-status-label {
+    display: none;
+  }
+
   .chat-messages {
     padding: 16px 16px;
   }
@@ -763,7 +796,25 @@ html, body, #app {
   }
 }
 
+@media (max-width: 640px) {
+  .app-header {
+    gap: 8px;
+  }
+
+  .header-settings {
+    gap: 8px;
+  }
+
+  .header-settings .form-select-sm {
+    max-width: 96px;
+  }
+}
+
 @media (max-width: 480px) {
+  .app-header-settings {
+    display: none;
+  }
+
   .app-sidebar {
     width: 0;
     min-width: 0;

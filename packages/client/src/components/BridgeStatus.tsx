@@ -22,7 +22,7 @@ export function BridgeStatus() {
         class="bridge-status-dot"
         style={{ backgroundColor: color }}
       />
-      <span>{label}</span>
+      <span class="bridge-status-label">{label}</span>
     </span>
   )
 }

@@ -74,10 +74,14 @@ export function App({ url }: { url?: string }) {
   return (
     <div class="app-layout">
       <header class="app-header">
-        <div class="app-header-left">
+        <a class="app-brand" href="/" aria-label="rooster home">
+          <span class="app-brand-mark" aria-hidden="true">🐓</span>
+          <span class="app-brand-name">rooster</span>
+        </a>
+        <div class="app-header-settings">
           <HeaderSettings />
         </div>
-        <div class="app-header-right">
+        <div class="app-header-actions">
           <BridgeStatus />
           <button
             type="button"
