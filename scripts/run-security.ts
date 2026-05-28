@@ -41,13 +41,18 @@ console.info('→ G2: osv-scanner (bun.lock)')
 
 console.info('→ G2: gitleaks (secrets leak detection)')
 {
-  const upstream = run('git', ['rev-parse', '--abbrev-ref', '@{u}'])
+  const override = process.env['GITLEAKS_LOG_OPTS']
   let logOpts: string
-  if (upstream.code === 0) {
-    logOpts = `${upstream.stdout.trim()}..HEAD`
+  if (override !== undefined && override !== '') {
+    logOpts = override
   } else {
-    console.info('  ⚠ gitleaks: no upstream branch, scanning recent 20 commits')
-    logOpts = '-20'
+    const upstream = run('git', ['rev-parse', '--abbrev-ref', '@{u}'])
+    if (upstream.code === 0) {
+      logOpts = `${upstream.stdout.trim()}..HEAD`
+    } else {
+      console.info('  ⚠ gitleaks: no upstream branch, scanning recent 20 commits')
+      logOpts = '-20'
+    }
   }
   const r = run('gitleaks', ['git', `--log-opts=${logOpts}`, '--no-banner'])
   if (r.code === 0) {

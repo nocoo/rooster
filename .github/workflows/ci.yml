@@ -1,0 +1,124 @@
+# rooster CI — Tier A (no L3, no probe)
+#
+# Mirrors docs/08-6dq-improvement.md §5. Three parallel jobs:
+#   - quality      : G1 (lint, typecheck) + L1 (test:coverage) + G2 (security)
+#   - coverage-gates: D1 (gate:isolation) + L2 static (gate:routes strict)
+#   - l2-e2e       : L2 runtime (test:e2e against real serve()+listen(0))
+#
+# Native rebuild: `bun install --frozen-lockfile` is allowed to run install
+# scripts. better-sqlite3 is listed in root `trustedDependencies` so bun
+# rebuilds it during install; the `bun run test*` scripts then short-circuit
+# via `scripts/ensure-native.ts` (hoist-aware as of `5d724df`).
+#
+# G2 gitleaks scope: the standalone `bun run gate:security` defaults to
+# `@{u}..HEAD`, which on a fresh CI checkout is the wrong range. We override
+# with GITLEAKS_LOG_OPTS pointing at the event-driven base ref so PRs scan
+# only the diff and pushes scan only the new commits.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────────────────
+  # G1 (lint + typecheck) + L1 (test:coverage) + G2 (security)
+  # ─────────────────────────────────────────────────────
+  quality:
+    name: "Quality (G1 + L1 + G2)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so gitleaks can scan a real commit range.
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: "G1: lint"
+        run: bun run lint
+
+      - name: "G1: typecheck"
+        run: bun run typecheck
+
+      - name: "L1: test:coverage"
+        run: bun run test:coverage
+
+      - name: Install gitleaks + osv-scanner
+        run: |
+          set -euo pipefail
+          GITLEAKS_VER=8.30.1
+          OSV_VER=2.3.8
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VER}/gitleaks_${GITLEAKS_VER}_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          curl -fsSL -o /tmp/osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/v${OSV_VER}/osv-scanner_linux_amd64"
+          sudo install -m 0755 /tmp/osv-scanner /usr/local/bin/osv-scanner
+          gitleaks version
+          osv-scanner --version
+
+      - name: "G2: gate:security"
+        env:
+          GITLEAKS_LOG_OPTS: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || format('{0}..{1}', github.event.before, github.sha) }}
+        run: bun run gate:security
+
+  # ─────────────────────────────────────────────────────
+  # D1 (gate:isolation) + L2 static (gate:routes strict)
+  # No native deps needed — these are tsx + regex scans.
+  # ─────────────────────────────────────────────────────
+  coverage-gates:
+    name: "Coverage Gates (D1 + L2 static)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: "D1: gate:isolation"
+        run: bun run gate:isolation
+
+      - name: "L2-static: gate:routes (strict)"
+        run: bun run gate:routes
+
+  # ─────────────────────────────────────────────────────
+  # L2 runtime: real serve() + listen(0) e2e
+  # ─────────────────────────────────────────────────────
+  l2-e2e:
+    name: "L2 E2E (real listen)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: "L2: test:e2e"
+        run: bun run test:e2e
