@@ -47,10 +47,6 @@ html, body, #app {
   line-height: 1;
 }
 
-.app-brand-name {
-  letter-spacing: -0.01em;
-}
-
 .app-header-settings {
   display: flex;
   align-items: center;
