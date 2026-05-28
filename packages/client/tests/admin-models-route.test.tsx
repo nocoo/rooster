@@ -60,9 +60,9 @@ describe('Admin models route', () => {
     expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
   })
 
-  it('keeps the phase placeholder for other admin slugs (e.g. /admin/jobs)', async () => {
+  it('keeps the phase placeholder for other admin slugs (e.g. /admin/settings)', async () => {
     const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/jobs" />)
+    render(<App url="/admin/settings" />)
 
     expect(screen.getByText(/ships in a later phase/i)).toBeTruthy()
     expect(screen.queryByText(/Read-only preview/i)).toBeNull()
