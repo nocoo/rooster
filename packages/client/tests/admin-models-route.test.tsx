@@ -7,7 +7,8 @@ import { activeSessionId, messages, loading } from '../src/state/sessions.js'
 
 const mockFetchSessions = vi.fn()
 const mockFetchMessages = vi.fn()
-const mockFetchProfiles = vi.fn()
+const mockFetchModels = vi.fn()
+const mockFetchProviders = vi.fn()
 
 vi.mock('../src/api/sessions.js', () => ({
   fetchSessions: (...args: unknown[]) => mockFetchSessions(...args) as unknown,
@@ -21,16 +22,16 @@ vi.mock('socket.io-client', () => ({
 }))
 
 vi.mock('../src/api/settings.js', () => ({
-  fetchProfiles: (...args: unknown[]) => mockFetchProfiles(...args) as unknown,
-  fetchModels: vi.fn().mockResolvedValue([]),
-  fetchProviders: vi.fn().mockResolvedValue([]),
+  fetchProfiles: vi.fn().mockResolvedValue([]),
+  fetchModels: (...args: unknown[]) => mockFetchModels(...args) as unknown,
+  fetchProviders: (...args: unknown[]) => mockFetchProviders(...args) as unknown,
 }))
 
 vi.mock('../src/api/health.js', () => ({
   fetchHealth: vi.fn().mockResolvedValue({ status: 'ok', timestamp: '', bridge: 'connected' }),
 }))
 
-describe('Admin profiles route', () => {
+describe('Admin models route', () => {
   beforeEach(() => {
     activeSessionId.value = null
     messages.value = []
@@ -38,17 +39,19 @@ describe('Admin profiles route', () => {
     mockFetchSessions.mockReset()
     mockFetchSessions.mockResolvedValue({ sessions: [], total: 0 })
     mockFetchMessages.mockReset()
-    mockFetchProfiles.mockReset()
-    mockFetchProfiles.mockResolvedValue([])
+    mockFetchModels.mockReset()
+    mockFetchModels.mockResolvedValue([])
+    mockFetchProviders.mockReset()
+    mockFetchProviders.mockResolvedValue([])
   })
 
   afterEach(() => {
     cleanup()
   })
 
-  it('renders the AdminProfilesPage at /admin/profiles instead of the phase placeholder', async () => {
+  it('renders the AdminModelsPage at /admin/models instead of the phase placeholder', async () => {
     const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/profiles" />)
+    render(<App url="/admin/models" />)
 
     await waitFor(() => {
       expect(screen.getByText(/Read-only preview/i)).toBeTruthy()
