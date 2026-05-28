@@ -4,6 +4,7 @@ import { AdminSkillsPage } from './admin/Skills.js'
 import { AdminPluginsPage } from './admin/Plugins.js'
 import { AdminMemoryPage } from './admin/Memory.js'
 import { AdminModelsPage } from './admin/Models.js'
+import { AdminFilesPage } from './admin/Files.js'
 
 function renderAdminSection(slug: string) {
   if (slug === '') return <AdminOverview />
@@ -12,6 +13,7 @@ function renderAdminSection(slug: string) {
   if (slug === 'plugins') return <AdminPluginsPage />
   if (slug === 'memory') return <AdminMemoryPage />
   if (slug === 'models') return <AdminModelsPage />
+  if (slug === 'files') return <AdminFilesPage />
   return <AdminSectionPlaceholder slug={slug} />
 }
 

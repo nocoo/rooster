@@ -2,13 +2,11 @@
  * @vitest-environment happy-dom
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, waitFor } from '@testing-library/preact'
+import { render, screen, cleanup } from '@testing-library/preact'
 import { activeSessionId, messages, loading } from '../src/state/sessions.js'
 
 const mockFetchSessions = vi.fn()
 const mockFetchMessages = vi.fn()
-const mockFetchModels = vi.fn()
-const mockFetchProviders = vi.fn()
 
 vi.mock('../src/api/sessions.js', () => ({
   fetchSessions: (...args: unknown[]) => mockFetchSessions(...args) as unknown,
@@ -23,15 +21,15 @@ vi.mock('socket.io-client', () => ({
 
 vi.mock('../src/api/settings.js', () => ({
   fetchProfiles: vi.fn().mockResolvedValue([]),
-  fetchModels: (...args: unknown[]) => mockFetchModels(...args) as unknown,
-  fetchProviders: (...args: unknown[]) => mockFetchProviders(...args) as unknown,
+  fetchModels: vi.fn().mockResolvedValue([]),
+  fetchProviders: vi.fn().mockResolvedValue([]),
 }))
 
 vi.mock('../src/api/health.js', () => ({
   fetchHealth: vi.fn().mockResolvedValue({ status: 'ok', timestamp: '', bridge: 'connected' }),
 }))
 
-describe('Admin models route', () => {
+describe('Admin files route', () => {
   beforeEach(() => {
     activeSessionId.value = null
     messages.value = []
@@ -39,24 +37,17 @@ describe('Admin models route', () => {
     mockFetchSessions.mockReset()
     mockFetchSessions.mockResolvedValue({ sessions: [], total: 0 })
     mockFetchMessages.mockReset()
-    mockFetchModels.mockReset()
-    mockFetchModels.mockResolvedValue([])
-    mockFetchProviders.mockReset()
-    mockFetchProviders.mockResolvedValue([])
   })
 
   afterEach(() => {
     cleanup()
   })
 
-  it('renders the AdminModelsPage at /admin/models instead of the phase placeholder', async () => {
+  it('renders AdminFilesPage at /admin/files instead of the phase placeholder', async () => {
     const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/models" />)
+    render(<App url="/admin/files" />)
 
-    await waitFor(() => {
-      expect(screen.getByText(/Read-only preview/i)).toBeTruthy()
-    })
-
+    expect(screen.getByText(/Protocol not ready/i)).toBeTruthy()
     expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
   })
 
@@ -65,6 +56,6 @@ describe('Admin models route', () => {
     render(<App url="/admin/logs" />)
 
     expect(screen.getByText(/ships in a later phase/i)).toBeTruthy()
-    expect(screen.queryByText(/Read-only preview/i)).toBeNull()
+    expect(screen.queryByText(/Protocol not ready/i)).toBeNull()
   })
 })
