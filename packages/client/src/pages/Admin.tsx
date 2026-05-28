@@ -1,11 +1,13 @@
 import { AdminSidebar, ADMIN_NAV_ITEMS } from '../components/AdminSidebar.js'
 import { AdminProfilesPage } from './admin/Profiles.js'
 import { AdminSkillsPage } from './admin/Skills.js'
+import { AdminPluginsPage } from './admin/Plugins.js'
 
 function renderAdminSection(slug: string) {
   if (slug === '') return <AdminOverview />
   if (slug === 'profiles') return <AdminProfilesPage />
   if (slug === 'skills') return <AdminSkillsPage />
+  if (slug === 'plugins') return <AdminPluginsPage />
   return <AdminSectionPlaceholder slug={slug} />
 }
 

@@ -2,12 +2,11 @@
  * @vitest-environment happy-dom
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, waitFor } from '@testing-library/preact'
+import { render, screen, cleanup } from '@testing-library/preact'
 import { activeSessionId, messages, loading } from '../src/state/sessions.js'
 
 const mockFetchSessions = vi.fn()
 const mockFetchMessages = vi.fn()
-const mockFetchProfiles = vi.fn()
 
 vi.mock('../src/api/sessions.js', () => ({
   fetchSessions: (...args: unknown[]) => mockFetchSessions(...args) as unknown,
@@ -21,7 +20,7 @@ vi.mock('socket.io-client', () => ({
 }))
 
 vi.mock('../src/api/settings.js', () => ({
-  fetchProfiles: (...args: unknown[]) => mockFetchProfiles(...args) as unknown,
+  fetchProfiles: vi.fn().mockResolvedValue([]),
   fetchModels: vi.fn().mockResolvedValue([]),
   fetchProviders: vi.fn().mockResolvedValue([]),
 }))
@@ -30,7 +29,7 @@ vi.mock('../src/api/health.js', () => ({
   fetchHealth: vi.fn().mockResolvedValue({ status: 'ok', timestamp: '', bridge: 'connected' }),
 }))
 
-describe('Admin profiles route', () => {
+describe('Admin plugins route', () => {
   beforeEach(() => {
     activeSessionId.value = null
     messages.value = []
@@ -38,22 +37,17 @@ describe('Admin profiles route', () => {
     mockFetchSessions.mockReset()
     mockFetchSessions.mockResolvedValue({ sessions: [], total: 0 })
     mockFetchMessages.mockReset()
-    mockFetchProfiles.mockReset()
-    mockFetchProfiles.mockResolvedValue([])
   })
 
   afterEach(() => {
     cleanup()
   })
 
-  it('renders the AdminProfilesPage at /admin/profiles instead of the phase placeholder', async () => {
+  it('renders AdminPluginsPage at /admin/plugins instead of the phase placeholder', async () => {
     const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/profiles" />)
+    render(<App url="/admin/plugins" />)
 
-    await waitFor(() => {
-      expect(screen.getByText(/Read-only preview/i)).toBeTruthy()
-    })
-
+    expect(screen.getByText(/Protocol not ready/i)).toBeTruthy()
     expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
   })
 
@@ -62,6 +56,6 @@ describe('Admin profiles route', () => {
     render(<App url="/admin/memory" />)
 
     expect(screen.getByText(/ships in a later phase/i)).toBeTruthy()
-    expect(screen.queryByText(/Read-only preview/i)).toBeNull()
+    expect(screen.queryByText(/Protocol not ready/i)).toBeNull()
   })
 })

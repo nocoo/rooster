@@ -51,9 +51,9 @@ describe('Admin skills route', () => {
     expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
   })
 
-  it('keeps the phase placeholder for other admin slugs (e.g. /admin/plugins)', async () => {
+  it('keeps the phase placeholder for other admin slugs (e.g. /admin/memory)', async () => {
     const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/plugins" />)
+    render(<App url="/admin/memory" />)
 
     expect(screen.getByText(/ships in a later phase/i)).toBeTruthy()
     expect(screen.queryByText(/Protocol not ready/i)).toBeNull()
