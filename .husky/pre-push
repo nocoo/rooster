@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# pre-push: G2 (Security gate) + L2 (test:e2e + gate:routes strict).
-# Order: e2e tests first (must pass before route coverage is meaningful),
-# then route coverage (strict), then security.
+# pre-push: L2 (test:e2e, gate:routes strict) + G2 (gate:security).
+# Matches docs/08-6dq-improvement.md §4 canonical layout. e2e tests run
+# before route coverage so the strict gate operates on a fresh hit ledger;
+# security gate runs last and gates the actual push.
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"

@@ -1,1 +1,11 @@
-bun run gate:isolation && bun run lint && bun run typecheck && bun run test:coverage
+#!/usr/bin/env bash
+# pre-commit: G1 (lint, typecheck) + L1 (test:coverage) + D1 (gate:isolation).
+# Order mirrors docs/08-6dq-improvement.md §4 — cheap static checks first
+# so contributors see lint/typecheck failures before the longer test run.
+set -euo pipefail
+
+echo "🐓 rooster pre-commit — G1 + L1 + D1"
+bun run lint
+bun run typecheck
+bun run test:coverage
+bun run gate:isolation

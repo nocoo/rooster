@@ -230,4 +230,8 @@ if (mode === 'strict' && (uncoveredRoutes.length > 0 || uncoveredEvents.length >
   process.exit(1)
 }
 
-console.info('\n✔ gate:routes report complete')
+if (mode === 'strict') {
+  console.info('\n✔ gate:routes PASSED — every route × method has at least one e2e hit')
+} else {
+  console.info('\n✔ gate:routes report complete')
+}
