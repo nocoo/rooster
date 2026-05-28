@@ -41,7 +41,6 @@ All dependencies use **latest stable** at time of project init (managed by bun).
 | Routing | preact-router | 3KB |
 | State | @preact/signals | 1KB |
 | Markdown | markdown-it + highlight.js + KaTeX | ~150KB (lazy-loaded) |
-| Terminal | @xterm/xterm | ~200KB (lazy-loaded, Phase 3 only) |
 | Real-time | socket.io-client | ~30KB |
 | HTTP | Native fetch (wrapper) | 0KB |
 

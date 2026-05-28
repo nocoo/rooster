@@ -44,11 +44,9 @@ IPC/Socket.IO protocol and API contract.
 | Memory browser | memory REST API |
 | Models & providers config | models/providers REST API |
 | File browser | files REST API |
-| Terminal | terminal WebSocket |
 | Logs viewer | logs REST API |
 | Jobs / cron history | jobs REST API |
 | Runtime config / settings | config REST API |
-| Self-update | update REST API |
 
 ### Explicitly Out of Scope
 

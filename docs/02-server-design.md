@@ -78,8 +78,6 @@ compatibility. Routes are implemented incrementally by phase:
 | `/api/hermes/logs` | GET | 3 |
 | `/api/hermes/jobs` | GET | 3 |
 | `/api/hermes/cron-history` | GET | 3 |
-| `/api/hermes/terminal` | WS | 3 |
-| `/api/hermes/update` | POST | 3 |
 
 **Never implemented**: auth, kanban, group-chat, tts, media,
 performance-monitor, weixin, proxy, codex/nous/copilot/xai-auth.
