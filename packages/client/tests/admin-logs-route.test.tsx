@@ -29,7 +29,7 @@ vi.mock('../src/api/health.js', () => ({
   fetchHealth: vi.fn().mockResolvedValue({ status: 'ok', timestamp: '', bridge: 'connected' }),
 }))
 
-describe('Admin files route', () => {
+describe('Admin logs route', () => {
   beforeEach(() => {
     activeSessionId.value = null
     messages.value = []
@@ -43,9 +43,9 @@ describe('Admin files route', () => {
     cleanup()
   })
 
-  it('renders AdminFilesPage at /admin/files instead of the phase placeholder', async () => {
+  it('renders AdminLogsPage at /admin/logs instead of the phase placeholder', async () => {
     const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/files" />)
+    render(<App url="/admin/logs" />)
 
     expect(screen.getByText(/Protocol not ready/i)).toBeTruthy()
     expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
