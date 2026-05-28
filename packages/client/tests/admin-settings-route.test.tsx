@@ -2,12 +2,11 @@
  * @vitest-environment happy-dom
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, waitFor } from '@testing-library/preact'
+import { render, screen, cleanup } from '@testing-library/preact'
 import { activeSessionId, messages, loading } from '../src/state/sessions.js'
 
 const mockFetchSessions = vi.fn()
 const mockFetchMessages = vi.fn()
-const mockFetchProfiles = vi.fn()
 
 vi.mock('../src/api/sessions.js', () => ({
   fetchSessions: (...args: unknown[]) => mockFetchSessions(...args) as unknown,
@@ -21,7 +20,7 @@ vi.mock('socket.io-client', () => ({
 }))
 
 vi.mock('../src/api/settings.js', () => ({
-  fetchProfiles: (...args: unknown[]) => mockFetchProfiles(...args) as unknown,
+  fetchProfiles: vi.fn().mockResolvedValue([]),
   fetchModels: vi.fn().mockResolvedValue([]),
   fetchProviders: vi.fn().mockResolvedValue([]),
 }))
@@ -30,7 +29,7 @@ vi.mock('../src/api/health.js', () => ({
   fetchHealth: vi.fn().mockResolvedValue({ status: 'ok', timestamp: '', bridge: 'connected' }),
 }))
 
-describe('Admin profiles route', () => {
+describe('Admin settings route', () => {
   beforeEach(() => {
     activeSessionId.value = null
     messages.value = []
@@ -38,30 +37,16 @@ describe('Admin profiles route', () => {
     mockFetchSessions.mockReset()
     mockFetchSessions.mockResolvedValue({ sessions: [], total: 0 })
     mockFetchMessages.mockReset()
-    mockFetchProfiles.mockReset()
-    mockFetchProfiles.mockResolvedValue([])
   })
 
   afterEach(() => {
     cleanup()
   })
 
-  it('renders the AdminProfilesPage at /admin/profiles instead of the phase placeholder', async () => {
-    const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/profiles" />)
-
-    await waitFor(() => {
-      expect(screen.getByText(/Read-only preview/i)).toBeTruthy()
-    })
-
-    expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
-  })
-
-  it('renders the Settings readiness page at /admin/settings, not a generic placeholder', async () => {
+  it('renders AdminSettingsPage at /admin/settings instead of the phase placeholder', async () => {
     const { App } = await import('../src/pages/App.js')
     render(<App url="/admin/settings" />)
 
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy()
     expect(screen.getByText(/Protocol not ready/i)).toBeTruthy()
     expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
   })

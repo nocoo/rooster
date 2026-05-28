@@ -51,11 +51,12 @@ describe('Admin jobs route', () => {
     expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
   })
 
-  it('keeps the phase placeholder for other admin slugs (e.g. /admin/settings)', async () => {
+  it('renders the Settings readiness page at /admin/settings, not a generic placeholder', async () => {
     const { App } = await import('../src/pages/App.js')
     render(<App url="/admin/settings" />)
 
-    expect(screen.getByText(/ships in a later phase/i)).toBeTruthy()
-    expect(screen.queryByText(/Protocol not ready/i)).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy()
+    expect(screen.getByText(/Protocol not ready/i)).toBeTruthy()
+    expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
   })
 })

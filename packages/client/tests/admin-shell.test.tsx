@@ -112,25 +112,26 @@ describe('Admin shell', () => {
     expect(overview.getAttribute('aria-current')).toBeNull()
   })
 
-  it('renders a known section placeholder without 404 at /admin/settings', async () => {
-    const { App } = await import('../src/pages/App.js')
-    render(<App url="/admin/settings" />)
-
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy()
-    expect(screen.getByText(/ships in a later phase/i)).toBeTruthy()
-  })
-
   it('renders an Unknown admin section placeholder for unknown slugs', async () => {
     const { App } = await import('../src/pages/App.js')
     const { container } = render(<App url="/admin/whatever" />)
 
     expect(screen.getByRole('heading', { name: /Unknown admin section/i })).toBeTruthy()
 
+    // Unknown placeholder must offer a way back to the admin overview.
+    const backLink = screen.getByRole('link', { name: /admin overview/i })
+    expect(backLink.getAttribute('href')).toBe('/admin')
+
+    // Sidebar still renders all 10 nav links, none marked as the current page.
     const sidebar = container.querySelector('.admin-sidebar') as HTMLElement
     const navLinks = sidebar.querySelectorAll('a.admin-nav-link')
     expect(navLinks.length).toBe(10)
     for (const link of navLinks) {
       expect(link.getAttribute('aria-current')).toBeNull()
     }
+
+    // No known admin section copy should leak in for an unknown slug.
+    expect(screen.queryByText(/ships in a later phase/i)).toBeNull()
+    expect(screen.queryByText(/Protocol not ready/i)).toBeNull()
   })
 })
