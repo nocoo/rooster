@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createApp } from '../src/app.js'
 import { createDb } from '../src/services/hermes/db.js'
 import { SessionStore } from '../src/services/hermes/session-store.js'
@@ -7,7 +7,9 @@ import { AgentBridgeClient } from '../src/services/hermes/agent-bridge.js'
 import type { Hono } from 'hono'
 import type Database from 'better-sqlite3'
 import net from 'node:net'
-import { unlinkSync } from 'node:fs'
+import { mkdtempSync, rmSync, unlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 describe('session search and export routes', () => {
   let app: Hono
@@ -16,11 +18,13 @@ describe('session search and export routes', () => {
   let messageStore: MessageStore
   let bridgeServer: net.Server
   let bridgePath: string
+  let uploadsDir: string
 
   beforeEach(() => {
     db = createDb(':memory:')
     sessionStore = new SessionStore(db)
     messageStore = new MessageStore(db)
+    uploadsDir = mkdtempSync(join(tmpdir(), 'rooster-test-search-uploads-'))
 
     bridgePath = `/tmp/rooster-test-search-${String(process.pid)}.sock`
     try { unlinkSync(bridgePath) } catch { /* ignore */ }
@@ -32,7 +36,11 @@ describe('session search and export routes', () => {
     })
     bridgeServer.listen(bridgePath)
     const bridge = new AgentBridgeClient({ endpoint: bridgePath })
-    app = createApp({ db, bridge })
+    app = createApp({ db, bridge, uploadsDir })
+  })
+
+  afterEach(() => {
+    rmSync(uploadsDir, { recursive: true, force: true })
   })
 
   describe('GET /api/hermes/search/sessions', () => {

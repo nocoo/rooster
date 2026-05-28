@@ -1,17 +1,21 @@
 /**
  * D1 Isolation runtime guard — Phase 3 of 6DQ improvement.
  *
- * Loaded as a vitest `setupFiles` entry. Complements the static gate
- * (`scripts/verify-test-isolation.ts`) by catching env-injected drift that
- * regex-based scanning cannot see (e.g. ROOSTER_DB_PATH set in a `.env`,
- * shell, or test wrapper at process start).
+ * Loaded as a vitest `setupFiles` entry. Scope is intentionally narrow:
+ * this guard only watches `process.env.ROOSTER_DB_PATH`. It catches env
+ * drift that regex-based scanning cannot see (e.g. ROOSTER_DB_PATH set in
+ * a `.env`, shell, or test wrapper at process start), and prevents tests
+ * from leaving the env mutated for later tests.
+ *
+ * Dynamic `createDb(path)` arguments are NOT intercepted at runtime — that
+ * would require monkey-patching the business `src/`, which we explicitly
+ * avoid. The static gate (`scripts/verify-test-isolation.ts`) covers the
+ * literal-argument case in test code; anything more dynamic is out of
+ * scope for both layers and would have to come from a code review.
  *
  * Per Reviewer-B msg=01da7cc6 / msg=bae15b4f: do NOT blanket-ban
  * ROOSTER_DB_PATH. Explicit `:memory:` and `os.tmpdir()`-rooted paths are
- * legitimate test values; reject only the resolver default (the on-tree
- * sqlite file in db.ts) or any other unspecified filesystem path. Also:
- * this guard lives in the test layer — business `src/` is not modified to
- * monkey-patch `createDb`.
+ * legitimate test values.
  */
 
 import { beforeAll, beforeEach, afterEach } from 'vitest'

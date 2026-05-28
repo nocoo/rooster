@@ -4,6 +4,9 @@ import { createHttpServer, type HttpServer } from '../../src/server.js'
 import { createDb } from '../../src/services/hermes/db.js'
 import type { AgentBridgeClient, AgentBridgeChatStarted, AgentBridgeOutput, AgentBridgeResponse } from '../../src/services/hermes/agent-bridge.js'
 import type { AddressInfo } from 'node:net'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 function createMockBridge(): AgentBridgeClient {
   let outputIndex = 0
@@ -32,15 +35,18 @@ function createMockBridge(): AgentBridgeClient {
 describe('Server bootstrap integration', () => {
   let server: HttpServer
   let client: ClientSocket
+  let uploadsDir: string
 
   afterEach(async () => {
     client.disconnect()
     await server.close()
+    rmSync(uploadsDir, { recursive: true, force: true })
   })
 
   it('should serve /chat-run namespace via createHttpServer()', async () => {
     const db = createDb(':memory:')
-    server = createHttpServer({ db, bridge: createMockBridge() })
+    uploadsDir = mkdtempSync(join(tmpdir(), 'rooster-test-bootstrap-uploads-'))
+    server = createHttpServer({ db, bridge: createMockBridge(), uploadsDir })
     server.httpServer.listen(0)
     const port = (server.httpServer.address() as AddressInfo).port
 
@@ -71,7 +77,8 @@ describe('Server bootstrap integration', () => {
 
   it('should serve Hono HTTP routes alongside Socket.IO', async () => {
     const db = createDb(':memory:')
-    server = createHttpServer({ db, bridge: createMockBridge() })
+    uploadsDir = mkdtempSync(join(tmpdir(), 'rooster-test-bootstrap-uploads-'))
+    server = createHttpServer({ db, bridge: createMockBridge(), uploadsDir })
     server.httpServer.listen(0)
     const port = (server.httpServer.address() as AddressInfo).port
 

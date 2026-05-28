@@ -1,20 +1,24 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { Hono } from 'hono'
 import { createApp } from '../src/app.js'
 import { createDb } from '../src/services/hermes/db.js'
 import { AgentBridgeClient } from '../src/services/hermes/agent-bridge.js'
 import type Database from 'better-sqlite3'
 import net from 'node:net'
-import { unlinkSync } from 'node:fs'
+import { mkdtempSync, rmSync, unlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 describe('app routes', () => {
   let app: Hono
   let db: Database.Database
   let bridgeServer: net.Server
   let bridgePath: string
+  let uploadsDir: string
 
   beforeEach(() => {
     db = createDb(':memory:')
+    uploadsDir = mkdtempSync(join(tmpdir(), 'rooster-test-app-uploads-'))
     bridgePath = `/tmp/rooster-test-app-bridge-${String(process.pid)}.sock`
     try { unlinkSync(bridgePath) } catch { /* ignore */ }
     bridgeServer = net.createServer((conn) => {
@@ -52,7 +56,11 @@ describe('app routes', () => {
     })
     bridgeServer.listen(bridgePath)
     const bridge = new AgentBridgeClient({ endpoint: bridgePath })
-    app = createApp({ db, bridge })
+    app = createApp({ db, bridge, uploadsDir })
+  })
+
+  afterEach(() => {
+    rmSync(uploadsDir, { recursive: true, force: true })
   })
 
   it('should respond 404 for unknown routes', async () => {
@@ -73,7 +81,7 @@ describe('app routes', () => {
 
     it('should return degraded when bridge is unreachable', async () => {
       const unreachableBridge = new AgentBridgeClient({ endpoint: '/tmp/nonexistent-bridge.sock', connectRetryMs: 100 })
-      const degradedApp = createApp({ db, bridge: unreachableBridge })
+      const degradedApp = createApp({ db, bridge: unreachableBridge, uploadsDir })
       const res = await degradedApp.request('/health')
       expect(res.status).toBe(200)
       const body = (await res.json()) as { status: string; bridge: string }
@@ -322,7 +330,7 @@ describe('app routes', () => {
       })
       emptyServer.listen(emptyPath)
       const emptyBridge = new AgentBridgeClient({ endpoint: emptyPath })
-      const emptyApp = createApp({ db, bridge: emptyBridge })
+      const emptyApp = createApp({ db, bridge: emptyBridge, uploadsDir })
 
       const profiles = await emptyApp.request('/api/hermes/profiles')
       expect(profiles.status).toBe(200)
