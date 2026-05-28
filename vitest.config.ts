@@ -4,6 +4,7 @@ import preact from '@preact/preset-vite'
 export default defineConfig({
   plugins: [preact({ devToolsEnabled: false })],
   test: {
+    setupFiles: ['packages/server/tests/setup-d1-guard.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

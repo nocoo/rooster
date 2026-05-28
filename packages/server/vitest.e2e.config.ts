@@ -8,5 +8,6 @@ export default defineConfig({
   root: here,
   test: {
     include: ['tests/e2e/**/*.e2e.test.ts'],
+    setupFiles: ['tests/setup-d1-guard.ts'],
   },
 })
