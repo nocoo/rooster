@@ -1,4 +1,11 @@
 import { AdminSidebar, ADMIN_NAV_ITEMS } from '../components/AdminSidebar.js'
+import { AdminProfilesPage } from './admin/Profiles.js'
+
+function renderAdminSection(slug: string) {
+  if (slug === '') return <AdminOverview />
+  if (slug === 'profiles') return <AdminProfilesPage />
+  return <AdminSectionPlaceholder slug={slug} />
+}
 
 function AdminOverview() {
   return (
@@ -53,7 +60,7 @@ export function AdminLayout({ section }: { path?: string; section?: string }) {
     <div class="admin-layout">
       <AdminSidebar activeSlug={activeSlug} />
       <main class="admin-content" tabIndex={-1}>
-        {slug === '' ? <AdminOverview /> : <AdminSectionPlaceholder slug={slug} />}
+        {renderAdminSection(slug)}
       </main>
     </div>
   )
