@@ -506,3 +506,72 @@ bun run test:e2e         # L2 runtime
 
 *Maintainer of this doc: SD-SDE-B. Review pair: SD-Reviewer-B. Source of truth
 for rubric: nmem memory `nocoo-6dq-score-log` (2026-05-07).*
+
+---
+
+## 11. Post-Upgrade Assessment
+
+Recorded after Phases 1–5 shipped to local `main` (HEAD `ae7d686`, 16 commits
+ahead of `origin/main` `5fc4ca3`). Pending: push + first green CI run.
+
+### 11.1 Shipped commits (local `main`)
+
+| Phase | Commits |
+|-------|---------|
+| 0 — doc | `cb2169d`, `f88b861` |
+| 1 — G2 | `10f2a2a`, `ca97515` |
+| 2 — L2 + gate:routes | `23b0236`, `38218ed`, `557117a`, `2bbe356`, `37978f7` |
+| 3 — D1 isolation | `ac7ad28`, `9c43ec0`, `4259da0`, `561d2af` |
+| 4 — hooks canonicalization | `f6fed80` |
+| 5 — CI | `5d724df`, `ae7d686` |
+
+### 11.2 Final per-dimension state
+
+| Dim | State | Evidence |
+|-----|-------|----------|
+| L0 | ✅ | `dev` / `build` / `start` scripts unchanged |
+| L1 | ✅ | 603 tests, 98.58% stmt / 95.18% br, `vitest.config.ts` thresholds 95/95/95/95 |
+| L2 | ✅ | `bun run test:e2e` → real `serve()` + `listen(0)`; `bun run gate:routes` strict 18/18 HTTP + 21/21 socket |
+| L3 | ❌ | Out of scope (Tier A target) |
+| G1 | ✅ | `bun run lint --max-warnings 0` + `bun run typecheck` |
+| G2 | ✅ | `bun run gate:security` (osv-scanner 2.3.8 + gitleaks 8.30.1); CI uses event-driven `GITLEAKS_LOG_OPTS` |
+| D1 | ✅ | Static: `bun run gate:isolation` (rejects non-tmp DB paths and uploads). Runtime: `packages/server/tests/setup-d1-guard.ts` enforces `ROOSTER_DB_PATH` allow-list at startup + afterEach |
+
+→ **Tier A** (S minus L3).
+
+### 11.3 Hook + CI matrix (shipped)
+
+```
+pre-commit:
+  G1 lint
+  G1 typecheck
+  L1 test:coverage
+  D1 gate:isolation
+
+pre-push:
+  L2 test:e2e
+  L2 gate:routes (strict)
+  G2 gate:security
+
+CI (.github/workflows/ci.yml, 3 parallel jobs):
+  quality        — G1 + L1 + G2
+  coverage-gates — D1 + L2-static (--ignore-scripts)
+  l2-e2e         — L2 runtime
+```
+
+No `l3-playwright`, no `probe`, no `workflow_dispatch` stub.
+
+### 11.4 Notes / deviations from §4
+
+- **Phase 5 native rebuild**: `scripts/ensure-native.ts` rewritten to be
+  hoist-aware via `createRequire(packages/server/package.json).resolve(...)`
+  walking up to the package root, instead of the original hardcoded
+  `packages/server/node_modules/better-sqlite3` path. quality and l2-e2e CI
+  jobs use `bun install --frozen-lockfile` (no `--ignore-scripts`); root
+  `trustedDependencies: ["better-sqlite3"]` lets bun rebuild during install,
+  and `ensure-native.ts` short-circuits at `bun run test*`. `coverage-gates`
+  uses `--ignore-scripts` because the tsx scans don't need the native binding.
+- **Phase 5 gitleaks scope**: standalone `bun run gate:security` defaults to
+  `@{u}..HEAD`, which is wrong on a fresh CI checkout. CI overrides via
+  `GITLEAKS_LOG_OPTS` env var: PR uses `base.sha..head.sha`, push uses
+  `before..sha`. Local hooks keep the `@{u}..HEAD` default.

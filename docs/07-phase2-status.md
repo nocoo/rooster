@@ -80,3 +80,12 @@ cd packages/client && bun run dev   # starts Vite on :5173 (proxies /api → :40
 ```
 
 Requires Hermes Agent running with bridge socket at `/tmp/hermes-agent-bridge.sock`.
+
+## 6DQ status (post-Phase-5)
+
+Phase 2 sits at Tier B baseline. The 6DQ improvement plan in
+[08-6dq-improvement.md](./08-6dq-improvement.md) lifted the repo to Tier A
+(S minus L3) by adding G2 (osv-scanner + gitleaks), L2 runtime e2e + route ×
+method coverage gate, D1 isolation static + runtime guards, canonical hook
+layout, and the `.github/workflows/ci.yml` workflow. See `docs/README.md` for
+the current gate matrix.
