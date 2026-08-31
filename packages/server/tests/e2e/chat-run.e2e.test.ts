@@ -80,9 +80,10 @@ describe('Socket.IO /chat-run', () => {
     port = (httpServer.address() as AddressInfo).port
   }
 
-  function connectClient(): ClientSocket {
+  function connectClient(autoConnect = true): ClientSocket {
     client = ioClient(`http://localhost:${String(port)}/chat-run`, {
       transports: ['websocket'],
+      autoConnect,
     })
     return client
   }
@@ -1693,11 +1694,8 @@ describe('Socket.IO /chat-run', () => {
       registerChatRunNamespace(ioServer, { bridge: createMockBridge(), sessionStore, messageStore, attachmentStore: attStore, uploadsDir })
       httpServer.listen(0)
       port = (httpServer.address() as AddressInfo).port
-      connectClient()
     })
 
-    // GitHub runners do real websocket + tmp-file I/O slower than dev machines;
-    // bump this case's timeout to absorb runner jitter without masking real hangs.
     it('should persist attachments on user message when provided', async () => {
       const { writeFile } = await import('node:fs/promises')
       const { join } = await import('node:path')
@@ -1716,6 +1714,9 @@ describe('Socket.IO /chat-run', () => {
       const attId = att?.id ?? ''
 
       await new Promise<void>((resolve) => {
+        // The async file setup can finish after an auto-connected client emits
+        // `connect`; attach handlers first so the run is always started.
+        connectClient(false)
         client.on('connect', () => {
           client.on('run.completed', () => { resolve() })
           client.emit('run', {
@@ -1726,6 +1727,7 @@ describe('Socket.IO /chat-run', () => {
             ],
           })
         })
+        client.connect()
       })
 
       const msgs = messageStore.list('sess-att')
@@ -1737,10 +1739,12 @@ describe('Socket.IO /chat-run', () => {
 
     it('should not set attachments on user message when not provided', async () => {
       await new Promise<void>((resolve) => {
+        connectClient(false)
         client.on('connect', () => {
           client.on('run.completed', () => { resolve() })
           client.emit('run', { input: 'plain', session_id: 'sess-no-att' })
         })
+        client.connect()
       })
 
       const msgs = messageStore.list('sess-no-att')
