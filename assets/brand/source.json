@@ -1,0 +1,51 @@
+{
+	"study": "rooster/2026-09-07-01",
+	"finishing": "02",
+	"method": "generated",
+	"generationCalls": 1,
+	"nativeDimensions": [2048, 2048],
+	"sourceRevisionBefore": "e6ccd8ee00929b51bfa15cf293b7b548f1df81d8",
+	"previous": {
+		"kind": "emoji",
+		"original": "/logos/emoji/rooster.png",
+		"sourcePath": "nocoo/nocoo README.md — existing project emoji",
+		"sourceUrl": "https://github.com/nocoo/nocoo/blob/9a7ad63e1e96428f9dcd12214bcdbd470b3b51c6/README.md",
+		"modified": false,
+		"width": 1024,
+		"height": 1024,
+		"bytes": 355436,
+		"sha256": "c622a972c61173d90608b6bdffd59b97ca69ceb82ccb4da59cabd8e58f0db918",
+		"thumbnail": "/logos/display/rooster-160.webp",
+		"display": "/logos/display/rooster-1024.webp"
+	},
+	"masters": {
+		"logo.png": {
+			"sha256": "26d77c01c7c8505d0b762f57782be514c9ce3986360a923e7e4655662085859f",
+			"width": 2048,
+			"height": 2048
+		},
+		"assets/brand/icon.png": {
+			"sha256": "6e243ede05a040b2d4fc09f15a293ee03b8958ea0f7571ba35df9b08c5f97643",
+			"width": 2048,
+			"height": 2048
+		},
+		"assets/brand/icon-rounded.png": {
+			"sha256": "2f45550f487019aaf8ae1af3d61aec143d092982e37520867df3574daffcccbf",
+			"width": 2048,
+			"height": 2048
+		}
+	},
+	"roundedClearancePx": 172.5,
+	"acceptance": {
+		"decisionSource": "owner-delegated batch acceptance",
+		"ownerReviewedExactBytes": false,
+		"scope": "Named ten-project batch"
+	},
+	"review": "https://hexly.ai/logos/rooster",
+	"archive": "https://github.com/nocoo/hexly.ai/tree/main/artwork/logo-family/rooster/2026-09-07-01",
+	"model": "gpt-image-2",
+	"generation": {
+		"path": "raw/generated.png",
+		"sha256": "eec0319d43260f7915b8a8a56111818aab0deb3af0af737e7b6943be9a865dd4"
+	}
+}

@@ -43,8 +43,11 @@ html, body, #app {
 }
 
 .app-brand-mark {
-  font-size: 16px;
-  line-height: 1;
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  object-fit: contain;
 }
 
 .app-header-settings {

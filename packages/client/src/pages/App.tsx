@@ -79,7 +79,7 @@ export function App({ url }: { url?: string }) {
     <div class="app-layout">
       <header class="app-header">
         <a class="app-brand" href="/" aria-label="rooster home">
-          <span class="app-brand-mark" aria-hidden="true">🐓</span>
+          <img class="app-brand-mark" src="/logo-24.png" width={24} height={24} alt="" aria-hidden="true" />
           <span class="app-brand-name">rooster</span>
         </a>
         <div class="app-header-settings">
