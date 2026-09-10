@@ -1,6 +1,5 @@
 import { api } from './client.js'
 import type {
-  Session,
   SessionListResponse,
   MessageListResponse,
   PaginatedMessagesResponse,
@@ -18,10 +17,6 @@ export async function fetchSessions(opts?: {
   if (opts?.profile) params.set('profile', opts.profile)
   const qs = params.toString()
   return api.get<SessionListResponse>(`/api/hermes/sessions${qs ? `?${qs}` : ''}`)
-}
-
-export async function fetchSession(id: string): Promise<Session> {
-  return api.get<Session>(`/api/hermes/sessions/${id}`)
 }
 
 export async function deleteSession(id: string): Promise<void> {

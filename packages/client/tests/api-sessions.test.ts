@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   fetchSessions,
-  fetchSession,
   deleteSession,
   renameSession,
   fetchMessages,
@@ -54,16 +53,6 @@ describe('sessions API', () => {
       mockGet.mockResolvedValue({ sessions: [], total: 0 })
       await fetchSessions({ limit: 20 })
       expect(mockGet).toHaveBeenCalledWith('/api/hermes/sessions?limit=20')
-    })
-  })
-
-  describe('fetchSession', () => {
-    it('should call GET /api/hermes/sessions/:id', async () => {
-      const session = { id: 's1', started_at: '2025-01-01', last_active: '2025-01-01' }
-      mockGet.mockResolvedValue(session)
-      const result = await fetchSession('s1')
-      expect(mockGet).toHaveBeenCalledWith('/api/hermes/sessions/s1')
-      expect(result).toEqual(session)
     })
   })
 
