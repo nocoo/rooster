@@ -28,7 +28,7 @@ const results: Result[] = []
 
 console.info('→ G2: osv-scanner (bun.lock)')
 {
-  const r = run('osv-scanner', ['--config=osv-scanner.toml', '--lockfile=bun.lock'])
+  const r = run('osv-scanner', ['scan', 'source', '--config=osv-scanner.toml', '--lockfile=bun.lock'])
   if (r.code === 0) {
     console.info('  ✔ osv-scanner: no vulnerabilities found')
     results.push({ tool: 'osv-scanner', ok: true })
@@ -54,7 +54,7 @@ console.info('→ G2: gitleaks (secrets leak detection)')
       logOpts = '-20'
     }
   }
-  const r = run('gitleaks', ['git', `--log-opts=${logOpts}`, '--no-banner'])
+  const r = run('gitleaks', ['git', `--log-opts=${logOpts}`, '--no-banner', '--redact'])
   if (r.code === 0) {
     console.info('  ✔ gitleaks: no leaks detected')
     results.push({ tool: 'gitleaks', ok: true })

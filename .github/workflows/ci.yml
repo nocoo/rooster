@@ -1,45 +1,52 @@
-# rooster CI — Tier A (no L3, no probe)
-
 name: CI
-
-on:
+'on':
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
-  workflow_dispatch:
-
+    branches:
+      - main
+  workflow_dispatch: null
+permissions:
+  contents: read
 jobs:
   quality:
-    name: "Quality (G1 + L1 + G2)"
-    uses: nocoo/base-ci/.github/workflows/quality.yml@ab52d72877d386c9a8fd224e9ac868e88be90539
+    name: Quality (G1 + L1 + G2)
+    uses: nocoo/base-ci/.github/workflows/quality.yml@ad43150de3a2be2fa464b5cd2f921dc4fa9f8f0f
     with:
-      runtime-version: "1.3.14"
-      install-policy: "trusted"
-      coverage-path: "coverage"
-      lint-command: "bun run lint"
-      typecheck-command: "bun run typecheck"
-      test-command: "bun run test:coverage"
-      osv-config: "osv-scanner.toml"
-      security-command: "bun run gate:security"
-    secrets: inherit
-
+      runtime-version: 1.3.14
+      install-policy: trusted
+      coverage-path: coverage
+      lint-command: bun run lint
+      typecheck-command: bun run typecheck
+      test-command: bun run test:coverage
+      security: false
+      disabled-check-reasons: '{"security": "Dedicated security job preserves the full checkout and event-specific Git range."}'
   coverage-gates:
-    name: "Coverage Gates (D1 + L2 static)"
-    uses: nocoo/base-ci/.github/workflows/test-job.yml@ab52d72877d386c9a8fd224e9ac868e88be90539
+    name: Coverage Gates (D1 + L2 static)
+    uses: nocoo/base-ci/.github/workflows/test-job.yml@ad43150de3a2be2fa464b5cd2f921dc4fa9f8f0f
     with:
-      runtime-version: "1.3.14"
-      install-policy: "blocked"
+      runtime-version: 1.3.14
+      install-policy: blocked
       timeout-minutes: 5
       command: |
         bun run gate:isolation
         bun run gate:routes
-
   l2-e2e:
-    name: "L2 E2E (real listen)"
-    uses: nocoo/base-ci/.github/workflows/test-job.yml@ab52d72877d386c9a8fd224e9ac868e88be90539
+    name: L2 E2E (real listen)
+    uses: nocoo/base-ci/.github/workflows/test-job.yml@ad43150de3a2be2fa464b5cd2f921dc4fa9f8f0f
     with:
-      runtime-version: "1.3.14"
-      install-policy: "trusted"
+      runtime-version: 1.3.14
+      install-policy: trusted
       timeout-minutes: 15
-      command: "bun run test:e2e"
+      command: bun run test:e2e
+  security:
+    uses: nocoo/base-ci/.github/workflows/security.yml@ad43150de3a2be2fa464b5cd2f921dc4fa9f8f0f
+    with:
+      package-manager: bun
+      runtime-version: 1.3.14
+      install-policy: trusted
+      scan-history: true
+      scan-secrets: false
+      scan-dependencies: false
+      security-command: GITLEAKS_LOG_OPTS="${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && format('{0}..{1}', github.event.before, github.sha)) || github.sha }}" bun run gate:security
