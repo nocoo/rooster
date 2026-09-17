@@ -81,10 +81,10 @@ Status: `enforced` | `planned` | `manual` | `N/A`.
 
 | Hook | Verifies | Budget | Runs |
 |---|---|---|---|
-| pre-commit | lint, typecheck, test:coverage, gate:isolation | <30s target | G1 → L1 → D1 |
-| pre-push | test:e2e, gate:routes, gate:security | <3min | L2 ‖ G2 |
+| pre-commit | working-tree lint, typecheck, `test:coverage`, `gate:isolation` (not `git checkout-index`) | target <30s (unmeasured) | G1 → L1 → D1 |
+| pre-push | working-tree `test:e2e` + `gate:routes`; G2 binaries required (not stdin push refs) | target <3min (unmeasured) | L2 ‖ G2 |
 
-Hooks check-only. `--no-verify` forbidden.
+Target: index-snapshot G1+L1; stdin-ref L2+G2. Check-only; `--no-verify` forbidden.
 
 ## Resources / Isolation
 
